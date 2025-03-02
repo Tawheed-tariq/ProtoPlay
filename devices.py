@@ -1,14 +1,16 @@
 class EndDevice:
-    def __init__(self, name, mac_address):
-        self.name = name
-        self.mac_address = mac_address
-        self.hub = None
+    def __init__(self, device_id, mac_address):
+        self.id = device_id
+        self.mac = mac_address
+        self.connected_to = None  # Hub, Switch, or direct connection
 
-    def connect_to_hub(self, hub):
-        self.hub = hub
-        hub.add_device(self)
-
-    def send_data(self, receiver_name, message):
-        if self.hub:
-            return self.hub.transmit_data(self.name, receiver_name, message)
-        return "❌ Device not connected to any hub!"
+    def send(self, data, destination, layer="physical"):
+        if layer == "data_link":
+            # Create a frame for Data Link Layer
+            frame = Frame(self.mac, destination.mac, data)
+            if self.connected_to:
+                self.connected_to.transmit(self, frame, destination)
+        else:
+            # Physical Layer: send raw data
+            if self.connected_to:
+                self.connected_to.transmit(self, data, destination)
