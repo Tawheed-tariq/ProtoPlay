@@ -4,18 +4,8 @@ class EndDevice:
     def __init__(self, device_id, mac_address):
         self.id = device_id
         self.mac = mac_address
-        self.connected_to = None  # Hub, Switch, or direct connection
+        self.connected_to = None
 
-    # def send(self, data, destination, layer="physical"):
-    #     if layer == "data_link":
-    #         # Create a frame for Data Link Layer
-    #         frame = Frame(self.mac, destination.mac, data)
-    #         if self.connected_to:
-    #             self.connected_to.transmit(self, frame, destination)
-    #     else:
-    #         # Physical Layer: send raw data
-    #         if self.connected_to:
-    #             return self.connected_to.transmit(self, data, destination)
     def send(self, data, destination, layer="physical"):
         if layer == "data_link":
             # Create a frame for Data Link Layer
@@ -82,7 +72,9 @@ class Network:
 
         # Logic for hubs
         if isinstance(entity1, Hub) and isinstance(entity2, EndDevice):
+            st.write(f"Connecting {entity1.id} and {entity2.id}")
             entity1.connected_devices.append(entity2)
+            st.write(f"Connected Devices: {[d.id for d in entity1.connected_devices]}")
             entity2.connected_to = entity1
         elif isinstance(entity2, Hub) and isinstance(entity1, EndDevice):
             entity2.connected_devices.append(entity1)
@@ -98,8 +90,11 @@ class Network:
 
         # Direct connection (e.g., device-to-device)
         else:
+            st.write(f"Connecting {entity1.id} and {entity2.id}")
             entity1.connected_to = entity2
             entity2.connected_to = entity1
+            st.write(f"{entity1.id} connected to {entity2.id}")
+            st.write(entity1.connected_to)
 
         self.connections.append((entity1, entity2))
         return True, f"Connected {entity1.id} and {entity2.id}."
