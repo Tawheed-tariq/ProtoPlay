@@ -1,10 +1,11 @@
 from core.data_link import Switch, Frame
 import streamlit as st
+
 class EndDevice:
     def __init__(self, device_id, mac_address):
         self.id = device_id
         self.mac = mac_address
-        self.connected_to = None
+        self.connected_to = None  # Hub, Switch, or direct connection
 
     def send(self, data, destination, layer="physical"):
         if layer == "data_link":
@@ -12,6 +13,9 @@ class EndDevice:
             frame = Frame(self.mac, destination.mac, data)
             if self.connected_to:
                 self.connected_to.transmit(self, frame, destination)
+            else:
+                # Direct connection (device-to-device)
+                destination.receive(data)
         else:
             st.write(f"Device {self.id} sending data to {destination.id}")
             st.write(f"{self.id} is connected to {self.connected_to}")
@@ -19,10 +23,12 @@ class EndDevice:
                 # Log transmission in Streamlit UI
                 st.write(f"Device {self.id} sending data to {destination.id} via {self.connected_to.id}")
                 success = self.connected_to.transmit(self, data, destination)
-                return success
+                return True
             else:
-                st.error(f"Device {self.id} is not connected to any hub/switch!")
-                return False
+                # Direct connection (device-to-device)
+                st.write(f"Device {self.id} sending data directly to {destination.id}")
+                destination.receive(data)
+                return True
 
     def receive(self, data):
         st.success(f"Device {self.id} received data: {data}")
@@ -45,7 +51,7 @@ class Hub:
                 device.receive(data)
                 st.write(f"Hub {self.id} sent data to {device.id}")
 
-        return data_reached  # Return True if data reached the destination 
+        return data_reached  # Return True if data reached the destination
 
 class Network:
     def __init__(self):
@@ -72,9 +78,7 @@ class Network:
 
         # Logic for hubs
         if isinstance(entity1, Hub) and isinstance(entity2, EndDevice):
-            st.write(f"Connecting {entity1.id} and {entity2.id}")
             entity1.connected_devices.append(entity2)
-            st.write(f"Connected Devices: {[d.id for d in entity1.connected_devices]}")
             entity2.connected_to = entity1
         elif isinstance(entity2, Hub) and isinstance(entity1, EndDevice):
             entity2.connected_devices.append(entity1)
@@ -90,11 +94,8 @@ class Network:
 
         # Direct connection (e.g., device-to-device)
         else:
-            st.write(f"Connecting {entity1.id} and {entity2.id}")
             entity1.connected_to = entity2
             entity2.connected_to = entity1
-            st.write(f"{entity1.id} connected to {entity2.id}")
-            st.write(entity1.connected_to)
 
         self.connections.append((entity1, entity2))
         return True, f"Connected {entity1.id} and {entity2.id}."

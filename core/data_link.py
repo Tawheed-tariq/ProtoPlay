@@ -1,9 +1,10 @@
 import streamlit as st
+
 class Switch:
     def __init__(self, switch_id):
         self.id = switch_id
         self.connected_devices = []  # Stores connected devices/hubs
-        self.mac_table = {}
+        self.mac_table = {}  # MAC: port
         self.max_ports = 2  # 2-port switch
 
     def is_port_available(self):
@@ -16,7 +17,6 @@ class Switch:
         else:
             # Flood to all ports except source
             for device in self.connected_devices:
-                print(device)
                 if device != source:
                     device.receive(data)
             # Learn the MAC address
