@@ -88,7 +88,7 @@ with st.sidebar:
     st.header("Layer Selection")
     selected_layer = st.selectbox(
         "Select Layer",
-        ["Physical Layer", "Data Link Layer"],
+        ["Physical Layer", "Data Link Layer", "Network layer", "Transport Layer", "Application Layer"],
         key="layer_selection"
     )
 
@@ -150,6 +150,12 @@ with st.expander("Create Connections"):
     entity2 = st.selectbox("Select Entity 2", entities, format_func=lambda x: x.id)
     
     if st.button("Connect"):
+        success, message = st.session_state.network.connect(entity1, entity2)
+        # After creating connections, print the connected_devices list for each hub
+        for hub in st.session_state.network.hubs:
+            st.write(hub)
+            st.write(f"Debug: Hub {hub.id} Connected Devices: {[d.id for d in hub.connected_devices]}")
+
         # Update connected_to attributes
         entity1.connected_to = entity2
         entity2.connected_to = entity1
@@ -195,6 +201,7 @@ for conn in st.session_state.connections:
     elif isinstance(entity2, Switch):
         st.session_state.switches[entity2.id] = entity2
 
+
 # Data Transmission (Physical Layer)
 if selected_layer == "Physical Layer":
     with st.expander("Send Data (Physical Layer)"):
@@ -208,10 +215,6 @@ if selected_layer == "Physical Layer":
             source = st.session_state.devices[source.id]
             dest = st.session_state.devices[dest.id]
 
-            # Debug: Check the state of source.connected_to
-            st.write(f"Debug: Source {source.id} connected_to = {source.connected_to}")
-            st.write(f"Debug: Destination {dest.id} connected_to = {dest.connected_to}")
-
             # Use Physical Layer transmission (raw data)
             path = find_path(source, dest, st.session_state.network)
             if path:
@@ -223,7 +226,7 @@ if selected_layer == "Physical Layer":
                     graph_placeholder.empty()  # Clear the previous graph
                     st.components.v1.html(html, height=450)  # Render the new graph
                 else:
-                    st.error(f"Destination {dest.id} not connected to the network")
+                    st.error(f"Destination {dest.id} not connected to the network not connected to the network")
             else:
                 st.error(f"No path found between {source.id} and {dest.id}")
 
