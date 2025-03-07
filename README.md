@@ -18,14 +18,17 @@ To get started with the Network Simulator, follow these steps:
     git clone https://github.com/Tawheed-tariq/Network-Simulator
     cd Network-Simulator
     ```
+2. **Create virtual environment**
 
-2. **Install the requirements:**
+    Create your virtual environment using venv or conda
+
+3. **Install the requirements:**
 
     ```bash
     pip install -r requirements.txt
     ```
 
-3. **Run the application:**
+4. **Run the application:**
 
     ```bash
     streamlit run app.py
