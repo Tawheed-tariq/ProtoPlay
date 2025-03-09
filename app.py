@@ -1,9 +1,11 @@
 import streamlit as st
-from core.physical import EndDevice, Hub, Network
+from core.devices import EndDevice, Hub, Switch
+from core.network import Network
 import networkx as nx
 from pyvis.network import Network as PyVisNetwork
 import time
 import os
+from functions import visualize_topology, find_path, restore_connections
 
 # Set page title and layout
 st.set_page_config(page_title="Network Simulator", layout="wide")
@@ -17,6 +19,8 @@ if 'devices' not in st.session_state:
     st.session_state.devices = {}  # Store devices by ID
 if 'hubs' not in st.session_state:
     st.session_state.hubs = {}  # Store hubs by ID
+if 'switches' not in st.session_state:
+    st.session_state.switches = {}  # Store switches by ID
 
 # Store connections in session state
 if 'connections' not in st.session_state:
@@ -26,110 +30,41 @@ if 'connections' not in st.session_state:
 if 'messages' not in st.session_state:
     st.session_state.messages = []  # List of transmitted messages
 
+# Selected network layer (default to physical)
+if 'selected_layer' not in st.session_state:
+    st.session_state.selected_layer = 1
+
 # Create a placeholder for the graph
 graph_placeholder = st.empty()
-
-def visualize_topology(network, connections, highlight_path=None):
-    """
-    Generate the PyVis graph and return the HTML content.
-    """
-    G = nx.Graph()
-
-    # Add all devices and hubs to the graph
-    for device in network.devices:
-        G.add_node(device.id, label=f"{device.id}\n{device.mac}", color='#6495ED', title=f"Device: {device.id}\nMAC: {device.mac}")
-    
-    for hub in network.hubs:
-        G.add_node(hub.id, label=f"Hub {hub.id}", color='#FF6347', shape='diamond', title=f"Hub: {hub.id}")
-
-    # Add all connections to the graph
-    for conn in connections:
-        G.add_edge(conn[0].id, conn[1].id)
-    
-    # Highlight the path if data is being transferred
-    if highlight_path:
-        for i in range(len(highlight_path) - 1):
-            if (highlight_path[i], highlight_path[i + 1]) in G.edges:
-                G.edges[(highlight_path[i], highlight_path[i + 1])]['color'] = '#32CD32'
-                G.edges[(highlight_path[i], highlight_path[i + 1])]['width'] = 3
-
-    # Create a PyVis network
-    net = PyVisNetwork(height="500px", width="100%", notebook=False)
-    net.from_nx(G)
-    
-    # Configure physics for better visualization
-    net.toggle_physics(True)
-    net.barnes_hut(spring_length=200, spring_strength=0.05)
-    
-    # Save the graph to a temporary file
-    os.makedirs('temp', exist_ok=True)
-    graph_path = "temp/network_graph.html"
-    net.save_graph(graph_path)
-    
-    with open(graph_path, "r", encoding="utf-8") as f:
-        html = f.read()
-    return html
-
-def find_path(source, destination, connections):
-    """
-    Find the path between two devices in the network.
-    Returns a list of entity IDs representing the path.
-    """
-    G = nx.Graph()
-    
-    # Add all connections to the graph
-    for conn in connections:
-        G.add_edge(conn[0].id, conn[1].id)
-
-    try:
-        path = nx.shortest_path(G, source=source.id, target=destination.id)
-        return path
-    except (nx.NetworkXNoPath, nx.NodeNotFound):
-        return None
-
-# Restore connections from session state - This is critical
-def restore_connections():
-    for conn in st.session_state.connections:
-        entity1, entity2 = conn
-        
-        # Ensure both entities are available
-        if (isinstance(entity1, EndDevice) and entity1.id in st.session_state.devices) or \
-           (isinstance(entity1, Hub) and entity1.id in st.session_state.hubs):
-            if (isinstance(entity2, EndDevice) and entity2.id in st.session_state.devices) or \
-               (isinstance(entity2, Hub) and entity2.id in st.session_state.hubs):
-                
-                # Get the current instances
-                if isinstance(entity1, EndDevice):
-                    entity1 = st.session_state.devices[entity1.id]
-                else:
-                    entity1 = st.session_state.hubs[entity1.id]
-                    
-                if isinstance(entity2, EndDevice):
-                    entity2 = st.session_state.devices[entity2.id]
-                else:
-                    entity2 = st.session_state.hubs[entity2.id]
-                
-                # Make sure they're connected
-                if entity2 not in entity1.connected_to:
-                    entity1.connect(entity2)
-                if entity1 not in entity2.connected_to:
-                    entity2.connect(entity1)
 
 # Restore connections at the beginning
 restore_connections()
 
 # Streamlit UI
-st.title("Network Simulator - Physical Layer")
+st.title("Network Simulator")
+
+# Layer selection in sidebar
+st.sidebar.header("Layer Selection")
+layer_options = {1: "Physical Layer", 2: "Data Link Layer"}
+selected_layer = st.sidebar.radio(
+    "Select Network Layer Focus",
+    list(layer_options.keys()),
+    format_func=lambda x: layer_options[x],
+    index=st.session_state.selected_layer - 1
+)
+
+# Update session state based on selection
+st.session_state.selected_layer = selected_layer
 
 # Create a two-column layout
 col1, col2 = st.columns([2, 3])
 
 with col1:
-    st.header("Network Configuration")
+    st.header(f"Network Configuration - {layer_options[selected_layer]}")
     
-    # Add devices and hubs
-    with st.expander("Add Devices & Hubs", expanded=True):
-        # Add End Device
+    # Add devices, hubs, and switches - filtered based on layer
+    with st.expander("Add Network Components", expanded=True):
+        # Add End Device - available in all layers
         with st.form("add_device"):
             st.subheader("Add End Device")
             device_id = st.text_input("Device ID", key="device_id")
@@ -147,7 +82,7 @@ with col1:
                 else:
                     st.error("Please provide both Device ID and MAC Address.")
         
-        # Add Hub
+        # Add Hub - available in all layers
         with st.form("add_hub"):
             st.subheader("Add Hub")
             hub_id = st.text_input("Hub ID", key="hub_id")
@@ -163,16 +98,39 @@ with col1:
                         st.error(f"Hub {hub_id} already exists!")
                 else:
                     st.error("Please provide a Hub ID.")
-    
-    # Connection Management
+
+        # Add Switch - only available in Data Link Layer (Layer 2) or higher
+        if st.session_state.selected_layer >= 2:
+            with st.form("add_switch"):
+                st.subheader("Add Switch")
+                switch_id = st.text_input("Switch ID", key="switch_id")
+                
+                if st.form_submit_button("Add Switch"):
+                    if switch_id:
+                        if switch_id not in st.session_state.switches:
+                            new_switch = Switch(switch_id)
+                            st.session_state.switches[switch_id] = new_switch
+                            st.session_state.network.add_switch(new_switch)
+                            st.success(f"Switch {switch_id} added")
+                        else:
+                            st.error(f"Switch {switch_id} already exists!")
+                    else:
+                        st.error("Please provide a Switch ID.")
+
+    # Connection Management - Filter available connections based on layer
     with st.expander("Create Connections", expanded=True):
-        entities = (list(st.session_state.devices.values()) + 
-                   list(st.session_state.hubs.values()))
+        # Get the entities available for the current layer
+        available_entities = list(st.session_state.devices.values()) + list(st.session_state.hubs.values())
         
-        if len(entities) >= 2:
-            entity1 = st.selectbox("Select Entity 1", entities, format_func=lambda x: f"{x.id} ({type(x).__name__})")
+        # Include switches only in Data Link Layer (Layer 2) or higher
+        if st.session_state.selected_layer >= 2:
+            available_entities += list(st.session_state.switches.values())
+        
+        if len(available_entities) >= 2:
+            st.subheader("Create Network Connection")
+            entity1 = st.selectbox("Select Entity 1", available_entities, format_func=lambda x: f"{x.id} ({type(x).__name__})")
             # Filter out the already selected entity
-            remaining_entities = [e for e in entities if e != entity1]
+            remaining_entities = [e for e in available_entities if e != entity1]
             entity2 = st.selectbox("Select Entity 2", remaining_entities, format_func=lambda x: f"{x.id} ({type(x).__name__})")
             
             if st.button("Connect"):
@@ -180,17 +138,20 @@ with col1:
                 success, message = st.session_state.network.connect(entity1, entity2)
                 
                 if success:
-                    # Store the connection in session state with updated entities
                     # Get fresh copies from session state to ensure we're using the current state
                     if isinstance(entity1, EndDevice):
                         entity1 = st.session_state.devices[entity1.id]
-                    else:
+                    elif isinstance(entity1, Hub):
                         entity1 = st.session_state.hubs[entity1.id]
+                    elif isinstance(entity1, Switch):
+                        entity1 = st.session_state.switches[entity1.id]
                         
                     if isinstance(entity2, EndDevice):
                         entity2 = st.session_state.devices[entity2.id]
-                    else:
+                    elif isinstance(entity2, Hub):
                         entity2 = st.session_state.hubs[entity2.id]
+                    elif isinstance(entity2, Switch):
+                        entity2 = st.session_state.switches[entity2.id]
                     
                     # Add the connection to our list
                     st.session_state.connections.append((entity1, entity2))
@@ -202,22 +163,32 @@ with col1:
                     # Update entities in session state
                     if isinstance(entity1, EndDevice):
                         st.session_state.devices[entity1.id] = entity1
-                    else:
+                    elif isinstance(entity1, Hub):
                         st.session_state.hubs[entity1.id] = entity1
+                    elif isinstance(entity1, Switch):
+                        st.session_state.switches[entity1.id] = entity1
                         
                     if isinstance(entity2, EndDevice):
                         st.session_state.devices[entity2.id] = entity2
-                    else:
+                    elif isinstance(entity2, Hub):
                         st.session_state.hubs[entity2.id] = entity2
+                    elif isinstance(entity2, Switch):
+                        st.session_state.switches[entity2.id] = entity2
                         
                     st.success(f"Connected {entity1.id} and {entity2.id}")
                 else:
                     st.error(message)
         else:
-            st.info("Add at least two entities (devices or hubs) to create connections.")
+            st.info("Add at least two network components to create connections.")
     
-    # Data Transmission
+    # Data Transmission - Layer-specific behavior
     with st.expander("Send Data", expanded=True):
+        # Layer-specific explanation
+        if st.session_state.selected_layer == 1:
+            st.info("Physical Layer Mode: Data transmission uses broadcast with hubs and unicast between directly connected devices.")
+        else:  # data_link layer
+            st.info("Data Link Layer Mode: Switches use MAC addresses for intelligent forwarding, while hubs continue to broadcast.")
+            
         devices = list(st.session_state.devices.values())
         if len(devices) >= 2:
             source = st.selectbox("Source Device", devices, format_func=lambda x: x.id)
@@ -229,12 +200,26 @@ with col1:
                 source = st.session_state.devices[source.id]
                 dest = st.session_state.devices[dest.id]
                 
-                # Find path between source and destination
-                path = find_path(source, dest, st.session_state.connections)
+                # Check if there's a valid path given the current layer
+                # In Layer 1, we can only connect if there's a physical path through devices and hubs
+                # In Layer 2+, we can also use switches
+                valid_connections = []
+                for conn in st.session_state.connections:
+                    # For Layer 1, exclude connections involving switches
+                    if st.session_state.selected_layer == 1:
+                        if not (isinstance(conn[0], Switch) or isinstance(conn[1], Switch)):
+                            valid_connections.append(conn)
+                    else:
+                        # For Layer 2+, include all connections
+                        valid_connections.append(conn)
+                
+                # Find path between source and destination using valid connections
+                path = find_path(source, dest, valid_connections)
                 
                 if path:
-                    # Send data using Physical Layer
-                    sent = source.send(data, dest, layer="physical")
+                    # Send data using selected layer
+                    layer = st.session_state.selected_layer
+                    sent = source.send(data, dest, layer=layer)
                     
                     if sent:
                         # Record the message
@@ -243,21 +228,52 @@ with col1:
                             "destination": dest.id,
                             "data": data,
                             "timestamp": time.strftime("%H:%M:%S"),
-                            "path": path
+                            "path": path,
+                            "layer": layer
                         })
                         
                         # Highlight the path during data transfer
-                        html = visualize_topology(st.session_state.network, st.session_state.connections, highlight_path=path)
+                        html = visualize_topology(st.session_state.network, valid_connections, highlight_path=path)
                         graph_placeholder.empty()  # Clear the previous graph
                         st.components.v1.html(html, height=500)  # Render the new graph
                         
-                        st.success(f"Data sent from {source.id} to {dest.id}")
+                        st.success(f"Data sent from {source.id} to {dest.id} using {layer_options[layer]}")
                     else:
                         st.error(f"Failed to send data to {dest.id}")
                 else:
-                    st.error(f"No path found between {source.id} and {dest.id}")
+                    st.error(f"No path found between {source.id} and {dest.id} in {layer_options[layer]}")
         else:
             st.info("Add at least two devices to send data.")
+
+    # Layer-specific Features
+    if st.session_state.selected_layer >= 2:
+        with st.expander("Data Link Layer Features", expanded=True):
+            st.subheader("MAC Address Table Management")
+            
+            # Get list of switches
+            switch_list = list(st.session_state.switches.values())
+            if switch_list:
+                selected_switch = st.selectbox("Select Switch", switch_list, format_func=lambda x: x.id)
+                
+                # Show current MAC table
+                if hasattr(selected_switch, 'mac_table'):
+                    st.write("**Current MAC Address Table:**")
+                    if selected_switch.mac_table:
+                        for mac, port in selected_switch.mac_table.items():
+                            st.write(f"MAC: {mac} → Port: {port}")
+                    else:
+                        st.write("MAC table is empty.")
+                
+                # Option to clear MAC table
+                if st.button("Clear MAC Table"):
+                    if hasattr(selected_switch, 'clear_mac_table'):
+                        selected_switch.clear_mac_table()
+                        st.session_state.switches[selected_switch.id] = selected_switch
+                        st.success(f"Cleared MAC table for switch {selected_switch.id}")
+                    else:
+                        st.error("This switch doesn't support clearing the MAC table.")
+            else:
+                st.info("Add at least one switch to use MAC table features.")
 
 # Create a debug button to restore connections
 if st.sidebar.button("Restore Connections"):
@@ -267,61 +283,100 @@ if st.sidebar.button("Restore Connections"):
 with col2:
     st.header("Network Topology")
     
-    # Initial visualization of the topology
-    html = visualize_topology(st.session_state.network, st.session_state.connections)
+    # Filter connections based on layer for visualization
+    visible_connections = []
+    for conn in st.session_state.connections:
+        # For Layer 1, exclude connections involving switches
+        if st.session_state.selected_layer == 1:
+            if not (isinstance(conn[0], Switch) or isinstance(conn[1], Switch)):
+                visible_connections.append(conn)
+        else:
+            # For Layer 2+, include all connections
+            visible_connections.append(conn)
+    
+    # Initial visualization of the topology with layer-appropriate connections
+    html = visualize_topology(st.session_state.network, visible_connections)
     graph_placeholder.empty()  # Clear the placeholder
     st.components.v1.html(html, height=500)  # Render the initial graph
     
-    # Message history
+    # Message history with layer information
     with st.expander("Message History", expanded=True):
-        if st.session_state.messages:
-            for idx, msg in enumerate(reversed(st.session_state.messages)):
-                st.write(f"**{msg['timestamp']}**: {msg['source']} → {msg['destination']}")
+        # Filter messages based on layer
+        layer_messages = [msg for msg in st.session_state.messages if msg.get('layer', 1) <= st.session_state.selected_layer]
+        
+        if layer_messages:
+            for idx, msg in enumerate(reversed(layer_messages)):
+                layer_info = msg.get('layer', 1)  # Default to physical if not specified
+                layer_name = layer_options[layer_info]
+                
+                st.write(f"**{msg['timestamp']}**: {msg['source']} → {msg['destination']} ({layer_name})")
                 st.text(f"Data: {msg['data']}")
                 st.text(f"Path: {' → '.join(msg['path'])}")
-                if idx < len(st.session_state.messages) - 1:
+                
+                # Show additional layer-specific information
+                if layer_info == 2:
+                    # For data link layer messages, we might want to show MAC addresses used
+                    if 'source_mac' in msg and 'dest_mac' in msg:
+                        st.text(f"Source MAC: {msg['source_mac']}, Destination MAC: {msg['dest_mac']}")
+                
+                if idx < len(layer_messages) - 1:
                     st.divider()
         else:
             st.info("No messages sent yet.")
     
-    # Show network information
+    # Show network information - filter components based on layer
     with st.expander("Network Information", expanded=True):
-        # Display devices
+        # Display devices - always visible
         st.subheader("Devices")
         if st.session_state.devices:
             for device_id, device in st.session_state.devices.items():
                 st.write(f"**Device**: {device_id}")
                 st.write(f"MAC: {device.mac}")
                 
-                # Update connected_to display
+                # Filter connected_to display based on layer
                 connected_to = []
                 for conn_entity in device.connected_to:
-                    connected_to.append(conn_entity.id)
+                    # In Layer 1, only show connections to devices and hubs
+                    if st.session_state.selected_layer == 1:
+                        if not isinstance(conn_entity, Switch):
+                            connected_to.append(conn_entity.id)
+                    else:
+                        # In Layer 2+, show all connections
+                        connected_to.append(conn_entity.id)
                 
                 if connected_to:
                     st.write(f"Connected to: {', '.join(connected_to)}")
                 else:
                     st.write("Connected to: None")
                 
-                # Show received messages
-                if device.received_data:
-                    st.subheader(f"Received Data ({len(device.received_data)})")
-                    for data in device.received_data:
-                        st.write(f"From {data['source']}: {data['data']}")
+                # Show received messages filtered by layer
+                layer_received = [data for data in device.received_data if data.get('layer', 1) <= st.session_state.selected_layer]
+                if layer_received:
+                    st.subheader(f"Received Data ({len(layer_received)})")
+                    for data in layer_received:
+                        received_via = data.get('layer', 1)
+                        layer_name = layer_options[received_via]
+                        st.write(f"From {data['source']} via {layer_name}: {data['data']}")
                 st.divider()
         else:
             st.info("No devices added yet.")
         
-        # Display hubs
+        # Display hubs - always visible
         st.subheader("Hubs")
         if st.session_state.hubs:
             for hub_id, hub in st.session_state.hubs.items():
                 st.write(f"**Hub**: {hub_id}")
                 
-                # Update connected_to display
+                # Filter connected_to display based on layer
                 connected_to = []
                 for conn_entity in hub.connected_to:
-                    connected_to.append(conn_entity.id)
+                    # In Layer 1, only show connections to devices and hubs
+                    if st.session_state.selected_layer == 1:
+                        if not isinstance(conn_entity, Switch):
+                            connected_to.append(conn_entity.id)
+                    else:
+                        # In Layer 2+, show all connections
+                        connected_to.append(conn_entity.id)
                 
                 if connected_to:
                     st.write(f"Connected to: {', '.join(connected_to)}")
@@ -331,10 +386,87 @@ with col2:
                 st.divider()
         else:
             st.info("No hubs added yet.")
+        
+        # Display switches - only visible in Layer 2+
+        if st.session_state.selected_layer >= 2:
+            st.subheader("Switches")
+            if st.session_state.switches:
+                for switch_id, switch in st.session_state.switches.items():
+                    st.write(f"**Switch**: {switch_id}")
+                    
+                    # Update connected_to display
+                    connected_to = []
+                    for conn_entity in switch.connected_to:
+                        connected_to.append(conn_entity.id)
+                    
+                    if connected_to:
+                        st.write(f"Connected to: {', '.join(connected_to)}")
+                    else:
+                        st.write("Connected to: None")
+                    
+                    # Display MAC Address Table if it exists
+                    if hasattr(switch, 'mac_table'):
+                        st.write("**MAC Address Table:**", unsafe_allow_html=True)
+                        
+                        if switch.mac_table:
+                            for mac, port in switch.mac_table.items():
+                                st.write(f"MAC: {mac} → Port: {port}")
+                        else:
+                            st.write("MAC table is empty.")
+                    
+                    st.divider()
+            else:
+                st.info("No switches added yet.")
+        
+        # Layer-specific network statistics
+        if st.session_state.selected_layer == 1:
+            # Show physical layer statistics
+            st.subheader("Physical Layer Statistics")
+            total_devices = len(st.session_state.devices)
+            total_hubs = len(st.session_state.hubs)
+            total_connections = len(visible_connections)  # Only count visible connections
+            
+            st.write(f"Total Devices: {total_devices}")
+            st.write(f"Total Hubs: {total_hubs}")
+            st.write(f"Total Connections: {total_connections}")
+            
+            # Calculate broadcast domains in physical layer (each hub creates one domain)
+            broadcast_domains = total_hubs
+            if broadcast_domains == 0 and total_devices > 0:
+                broadcast_domains = 1  # At least one broadcast domain if devices exist
+            st.write(f"Total Broadcast Domains: {broadcast_domains}")
+            
+        else:  # data_link layer statistics
+            st.subheader("Data Link Layer Statistics")
+            total_devices = len(st.session_state.devices)
+            total_hubs = len(st.session_state.hubs)
+            total_switches = len(st.session_state.switches)
+            
+            st.write(f"Total Devices: {total_devices}")
+            st.write(f"Total Hubs: {total_hubs}")
+            st.write(f"Total Switches: {total_switches}")
+            
+            # Calculate broadcast domains in data link layer 
+            # (each switch creates one domain, each hub shares a domain)
+            broadcast_domains = total_switches
+            if total_hubs > 0 or (total_devices > 0 and total_switches == 0):
+                broadcast_domains += 1  # Add one domain for all connected hubs
+            st.write(f"Total Broadcast Domains: {broadcast_domains}")
+            
+            # Calculate collision domains
+            # In data link layer: switches create separate collision domains for each port
+            # Count connections to switches plus one domain for each hub
+            collision_domains = 0
+            for switch in st.session_state.switches.values():
+                collision_domains += len(switch.connected_to)
+            collision_domains += total_hubs  # Each hub is one collision domain
+            if collision_domains == 0 and total_devices > 0:
+                collision_domains = 1  # At least one collision domain if devices exist
+            st.write(f"Total Collision Domains: {collision_domains}")
 
 # Add reset button at the bottom
 if st.button("Reset Network"):
-    for key in ['network', 'devices', 'hubs', 'connections', 'messages']:
+    for key in ['network', 'devices', 'hubs', 'switches', 'connections', 'messages', 'selected_layer']:
         if key in st.session_state:
             del st.session_state[key]
     st.rerun()
