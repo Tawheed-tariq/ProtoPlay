@@ -138,7 +138,7 @@ class Hub(Entity):
                         success = True
                 elif isinstance(device, Hub):
                     # Forward through connected hubs (avoiding loops)
-                    hub_success = device.forward(data, source, destination)
+                    hub_success = device.forward(data, self, destination)
                     if hub_success and destination is not None:
                         success = True
         
