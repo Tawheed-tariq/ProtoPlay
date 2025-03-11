@@ -1,2 +1,13 @@
 temp/
 lib/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pyw
+*.pyz
+*.pyzw
+*.pyc
+*.pyo
+*.pyd
+*.pyw
