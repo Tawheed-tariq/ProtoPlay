@@ -26,7 +26,7 @@ class EndDevice(Entity):
         self.mac = mac
         self.received_data = []  # Store received data
         
-    def send(self, data, destination, layer=1):
+    def send(self, data, destination, layer=1, visited=None):
         """
         Send data to a destination device at the specified layer
         
@@ -38,6 +38,9 @@ class EndDevice(Entity):
         Returns:
         Boolean indicating success or failure
         """
+        if visited is None:
+            visited = set()
+        visited.add(self)
         # Layer 1: Physical Layer (bits transmission)
         if layer == 1:
             # At physical layer, we just send bits
@@ -48,12 +51,13 @@ class EndDevice(Entity):
                     
             # If not directly connected, check if we're connected to a hub
             for entity in self.connected_to:
-                if isinstance(entity, Hub):
-                    # Forward through the hub
-                    return entity.forward(data, self, destination)
-                elif isinstance(entity, EndDevice):
-                    # Not connected to a hub, send directly to the device
-                    return entity.send(data,destination, layer=layer)
+                if entity not in visited:
+                    if isinstance(entity, Hub):
+                        # Forward through the hub
+                        return entity.forward(data, self, destination)
+                    elif isinstance(entity, EndDevice):
+                        # Not connected to a hub, send directly to the device
+                        return entity.send(data,destination, layer=layer, visited=visited)
             
             return False
             

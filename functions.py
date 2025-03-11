@@ -28,8 +28,8 @@ def visualize_topology(network, connections, highlight_path=None):
     if highlight_path:
         for i in range(len(highlight_path) - 1):
             if (highlight_path[i], highlight_path[i + 1]) in G.edges:
-                G.edges[(highlight_path[i], highlight_path[i + 1])]['color'] = '#32CD32'
-                G.edges[(highlight_path[i], highlight_path[i + 1])]['width'] = 3
+                G.edges[(highlight_path[i], highlight_path[i + 1])]['color'] = '#28A428'
+                G.edges[(highlight_path[i], highlight_path[i + 1])]['width'] = 6
 
     # Create a PyVis network
     net = PyVisNetwork(height="500px", width="100%", notebook=False)
