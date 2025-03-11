@@ -51,6 +51,9 @@ class EndDevice(Entity):
                 if isinstance(entity, Hub):
                     # Forward through the hub
                     return entity.forward(data, self, destination)
+                elif isinstance(entity, EndDevice):
+                    # Not connected to a hub, send directly to the device
+                    return entity.send(data,destination, layer=layer)
             
             return False
             
