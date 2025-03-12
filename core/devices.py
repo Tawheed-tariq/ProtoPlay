@@ -168,7 +168,7 @@ class Switch(Entity):
         if layer < 2:
             return False
         destination_mac = frame["dest_mac"]
-        
+
         # Learn the source MAC address
         self.mac_table[frame["source_mac"]] = source
         
@@ -182,6 +182,7 @@ class Switch(Entity):
             success = False
             for device in self.connected_to:
                 if device != source:
+                    print(device)
                     if isinstance(device, Hub):
                         # Hubs broadcast to all connected devices
                         success = device.forward(frame, source, destination)
@@ -189,6 +190,7 @@ class Switch(Entity):
                         # Switches forward to all connected devices
                         success = device.forward(frame, source)
                     else:
+                        print(device)
                         device.receive(frame, source, layer=layer)
                         success = True
             return success
