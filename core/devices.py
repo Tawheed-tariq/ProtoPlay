@@ -84,6 +84,10 @@ class EndDevice(Entity):
                 # If connected to a switch, it will use MAC addresses for forwarding
                 elif isinstance(entity, Switch):
                     return entity.forward(frame, self, destination, layer=layer)
+                
+                #If connected to a bridge, it will filter and forward between segments
+                elif isinstance(entity, Bridge):
+                    return entity.forward(frame, self, destination, layer=layer)
             
             return False
         
@@ -128,7 +132,7 @@ class Hub(Entity):
     def __init__(self, id):
         super().__init__(id)
         
-    def forward(self, data, source, destination=None):
+    def forward(self, data, source, destination=None, layer=1):
         """
         Forward data from source to all connected devices except the source
         In a hub, data is forwarded to all devices regardless of the destination
@@ -139,13 +143,13 @@ class Hub(Entity):
         for device in self.connected_to:
             if device != source:  # Don't send back to sender
                 if isinstance(device, EndDevice):
-                    device.receive(data, source)
+                    device.receive(data, self, layer=layer)
                     # If this device is our destination, mark success
                     if device == destination:
                         success = True
-                elif isinstance(device, Hub):
+                elif isinstance(device, Hub) or isinstance(device, Switch) or isinstance(device, Bridge):
                     # Forward through connected hubs (avoiding loops)
-                    hub_success = device.forward(data, self, destination)
+                    hub_success = device.forward(data, self, destination, layer=layer)
                     if hub_success and destination is not None:
                         success = True
         
@@ -189,6 +193,9 @@ class Switch(Entity):
                     elif isinstance(device, Switch):
                         # Switches forward to all connected devices
                         success = device.forward(frame, source)
+                    elif isinstance(device, Bridge):
+                        # Bridges filter and forward between segments
+                        success = device.forward(frame, self, destination, layer=layer)
                     else:
                         print(device)
                         device.receive(frame, source, layer=layer)
@@ -230,7 +237,7 @@ class Bridge(Entity):
                         device.receive(frame, source, layer=layer)
                         success = True
                     elif isinstance(device, Switch) or isinstance(device, Hub):
-                        success = device.forward(frame, source, destination)
+                        success = device.forward(frame, self, destination, layer= layer)
             
             return success
 
