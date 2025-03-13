@@ -198,3 +198,41 @@ class Switch(Entity):
     def __str__(self):
         return f"Switch(id={self.id})"
 
+class Bridge(Entity):
+    """Represents a bridge in the network that filters and forwards frames between network segments"""
+    def __init__(self, id):
+        super().__init__(id)
+        self.mac_table = {}  # MAC address to port mapping
+    
+    def forward(self, frame, source, destination=None, layer=2):
+        """
+        Forward frames based on MAC addresses, filtering traffic between segments
+        """
+        if layer < 2:
+            return False
+
+        destination_mac = frame["dest_mac"]
+
+        # Learn the source MAC address and associate it with the source port
+        self.mac_table[frame["source_mac"]] = source
+
+        # If the destination MAC is known, forward only to the correct port
+        if destination_mac in self.mac_table:
+            destination_device = self.mac_table[destination_mac]
+            destination_device.receive(frame, source, layer=layer)
+            return True
+        else:
+            # Flood the frame only to the other segment
+            success = False
+            for device in self.connected_to:
+                if device != source:
+                    if isinstance(device, EndDevice):
+                        device.receive(frame, source, layer=layer)
+                        success = True
+                    elif isinstance(device, Switch) or isinstance(device, Hub):
+                        success = device.forward(frame, source, destination)
+            
+            return success
+
+    def __str__(self):
+        return f"Bridge(id={self.id})"

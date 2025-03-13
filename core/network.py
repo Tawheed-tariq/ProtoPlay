@@ -1,10 +1,12 @@
-from core.devices import EndDevice, Hub, Switch
+from core.devices import EndDevice, Hub, Switch, Bridge
+
 class Network:
     """Represents the entire network"""
     def __init__(self):
         self.devices = []
         self.hubs = []
         self.switches = []
+        self.bridges = []
         
     def add_device(self, device):
         """Add a device to the network"""
@@ -25,7 +27,14 @@ class Network:
         if switch not in self.switches:
             self.switches.append(switch)
             return True
-        return
+        return False
+    
+    def add_bridge(self, bridge):
+        """Add a bridge to the network"""
+        if bridge not in self.bridges:
+            self.bridges.append(bridge)
+            return True
+        return False
 
     def connect(self, entity1, entity2):
         """Connect two entities in the network"""

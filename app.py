@@ -1,5 +1,5 @@
 import streamlit as st
-from core.devices import EndDevice, Hub, Switch
+from core.devices import EndDevice, Hub, Switch ,Bridge
 from core.network import Network
 import networkx as nx
 from pyvis.network import Network as PyVisNetwork
@@ -21,6 +21,8 @@ if 'hubs' not in st.session_state:
     st.session_state.hubs = {}  # Store hubs by ID
 if 'switches' not in st.session_state:
     st.session_state.switches = {}  # Store switches by ID
+if 'bridges' not in st.session_state:
+    st.session_state.bridges = {}  # Store bridges by ID
 
 # Store connections in session state
 if 'connections' not in st.session_state:
@@ -62,7 +64,7 @@ col1, col2 = st.columns([2, 3])
 with col1:
     st.header(f"Network Configuration - {layer_options[selected_layer]}")
     
-    # Add devices, hubs, and switches - filtered based on layer
+    # Add devices, hubs, and switches  , bridges - filtered based on layer
     with st.expander("Add Network Components", expanded=True):
         # Add End Device - available in all layers
         with st.form("add_device"):
@@ -116,6 +118,24 @@ with col1:
                             st.error(f"Switch {switch_id} already exists!")
                     else:
                         st.error("Please provide a Switch ID.")
+        # Add Bridge - Only available in Data Link Layer (Layer 2) or higher
+        if st.session_state.selected_layer >= 2:
+            with st.form("add_bridge"):
+                st.subheader("Add Bridge")
+                bridge_id = st.text_input("Bridge ID", key="bridge_id")
+        
+                if st.form_submit_button("Add Bridge"):
+                    if bridge_id:
+                        if bridge_id not in st.session_state.bridges:
+                            new_bridge = Bridge(bridge_id)  # Assuming you have a Bridge class
+                            st.session_state.bridges[bridge_id] = new_bridge
+                            st.session_state.network.add_bridge(new_bridge)
+                            st.success(f"Bridge {bridge_id} added")
+                        else:
+                            st.error(f"Bridge {bridge_id} already exists!")
+                    else:
+                        st.error("Please provide a Bridge ID.")
+                
 
     # Connection Management - Filter available connections based on layer
     with st.expander("Create Connections", expanded=True):
@@ -124,7 +144,7 @@ with col1:
         
         # Include switches only in Data Link Layer (Layer 2) or higher
         if st.session_state.selected_layer >= 2:
-            available_entities += list(st.session_state.switches.values())
+            available_entities += list(st.session_state.switches.values()) + list(st.session_state.bridges.values())
         
         if len(available_entities) >= 2:
             st.subheader("Create Network Connection")
@@ -145,6 +165,8 @@ with col1:
                         entity1 = st.session_state.hubs[entity1.id]
                     elif isinstance(entity1, Switch):
                         entity1 = st.session_state.switches[entity1.id]
+                    elif isinstance(entity1, Bridge):
+                        entity1 = st.session_state.bridges[entity1.id]    
                         
                     if isinstance(entity2, EndDevice):
                         entity2 = st.session_state.devices[entity2.id]
@@ -152,6 +174,8 @@ with col1:
                         entity2 = st.session_state.hubs[entity2.id]
                     elif isinstance(entity2, Switch):
                         entity2 = st.session_state.switches[entity2.id]
+                    elif isinstance(entity2, Bridge):
+                        entity2 = st.session_state.bridges[entity2.id]    
                     
                     # Add the connection to our list
                     st.session_state.connections.append((entity1, entity2))
@@ -167,6 +191,8 @@ with col1:
                         st.session_state.hubs[entity1.id] = entity1
                     elif isinstance(entity1, Switch):
                         st.session_state.switches[entity1.id] = entity1
+                    elif isinstance(entity1, Bridge):
+                        st.session_state.bridges[entity1.id] = entity1    
                         
                     if isinstance(entity2, EndDevice):
                         st.session_state.devices[entity2.id] = entity2
@@ -174,7 +200,9 @@ with col1:
                         st.session_state.hubs[entity2.id] = entity2
                     elif isinstance(entity2, Switch):
                         st.session_state.switches[entity2.id] = entity2
-                        
+                    elif isinstance(entity2, Bridge):
+                        st.session_state.bridges[entity2.id] = entity2
+                            
                     st.success(f"Connected {entity1.id} and {entity2.id}")
                 else:
                     st.error(message)
@@ -187,7 +215,7 @@ with col1:
         if st.session_state.selected_layer == 1:
             st.info("Physical Layer Mode: Data transmission uses broadcast with hubs and unicast between directly connected devices.")
         else:  # data_link layer
-            st.info("Data Link Layer Mode: Switches use MAC addresses for intelligent forwarding, while hubs continue to broadcast.")
+            st.info("Data Link Layer Mode: Switches and Bridges use MAC addresses for intelligent forwarding, while hubs continue to broadcast.")
             
         devices = list(st.session_state.devices.values())
         if len(devices) >= 2:
@@ -207,7 +235,8 @@ with col1:
                 for conn in st.session_state.connections:
                     # For Layer 1, exclude connections involving switches
                     if st.session_state.selected_layer == 1:
-                        if not (isinstance(conn[0], Switch) or isinstance(conn[1], Switch)):
+                        if not (isinstance(conn[0], Switch) or isinstance(conn[1], Switch) or 
+                            isinstance(conn[0], Bridge) or isinstance(conn[1], Bridge)):
                             valid_connections.append(conn)
                     else:
                         # For Layer 2+, include all connections
@@ -250,30 +279,32 @@ with col1:
         with st.expander("Data Link Layer Features", expanded=True):
             st.subheader("MAC Address Table Management")
             
-            # Get list of switches
-            switch_list = list(st.session_state.switches.values())
-            if switch_list:
-                selected_switch = st.selectbox("Select Switch", switch_list, format_func=lambda x: x.id)
+            # Get list of switches and bridges
+            network_devices = list(st.session_state.switches.values()) + list(st.session_state.bridges.values())
+            if network_devices:
+                selected_device = st.selectbox("Select Device", network_devices, format_func=lambda x: x.id)
                 
                 # Show current MAC table
-                if hasattr(selected_switch, 'mac_table'):
+                if hasattr(selected_device, 'mac_table'):
                     st.write("**Current MAC Address Table:**")
-                    if selected_switch.mac_table:
-                        for mac, port in selected_switch.mac_table.items():
-                            st.write(f"MAC: {mac} → Port: {port}")
+                    for mac, port in selected_device.mac_table.items():
+                        st.write(f"MAC: {mac} → Port: {port}")
                     else:
                         st.write("MAC table is empty.")
                 
                 # Option to clear MAC table
                 if st.button("Clear MAC Table"):
-                    if hasattr(selected_switch, 'clear_mac_table'):
-                        selected_switch.clear_mac_table()
-                        st.session_state.switches[selected_switch.id] = selected_switch
-                        st.success(f"Cleared MAC table for switch {selected_switch.id}")
+                    if hasattr(selected_device, 'clear_mac_table'):
+                        selected_device.clear_mac_table()
+                        if isinstance(selected_device, Switch):
+                            st.session_state.switches[selected_device.id] = selected_device
+                    elif isinstance(selected_device, Bridge):
+                        st.session_state.bridges[selected_device.id] = selected_device
+                        st.success(f"Cleared MAC table for : {selected_device.id}")
                     else:
                         st.error("This switch doesn't support clearing the MAC table.")
             else:
-                st.info("Add at least one switch to use MAC table features.")
+                st.info("Add at least one switch or bridge to use MAC table features.")
 
 # Create a debug button to restore connections
 if st.sidebar.button("Restore Connections"):
@@ -389,8 +420,10 @@ with col2:
         
         # Display switches - only visible in Layer 2+
         if st.session_state.selected_layer >= 2:
-            st.subheader("Switches")
-            if st.session_state.switches:
+            st.subheader("Switches and Bridges")
+            
+            if st.session_state.switches or st.session_state.bridges:
+                # Display Switches
                 for switch_id, switch in st.session_state.switches.items():
                     st.write(f"**Switch**: {switch_id}")
                     
@@ -415,8 +448,26 @@ with col2:
                             st.write("MAC table is empty.")
                     
                     st.divider()
+                    # Display Bridges
+                for bridge_id, bridge in st.session_state.bridges.items():
+                    st.write(f"**Bridge**: {bridge_id}")
+            
+                    connected_to = [conn_entity.id for conn_entity in bridge.connected_to]
+                    st.write(f"Connected to: {', '.join(connected_to) if connected_to else 'None'}")
+            
+                    if hasattr(bridge, 'fdb'):
+                       st.write("**Filtering Database (FDB):**", unsafe_allow_html=True)
+                       if bridge.fdb:
+                           for mac, port in bridge.fdb.items():
+                               st.write(f"MAC: {mac} → Port: {port}")          
+                    
+                    else:
+                        st.write("FDB is empty.")
+            
+                    st.divider()
             else:
-                st.info("No switches added yet.")
+                st.info("No switches and bridges are added yet.")
+                
         
         # Layer-specific network statistics
         if st.session_state.selected_layer == 1:
@@ -441,32 +492,42 @@ with col2:
             total_devices = len(st.session_state.devices)
             total_hubs = len(st.session_state.hubs)
             total_switches = len(st.session_state.switches)
+            total_bridges=len(st.session_state.bridges)
             
             st.write(f"Total Devices: {total_devices}")
             st.write(f"Total Hubs: {total_hubs}")
             st.write(f"Total Switches: {total_switches}")
+            st.write(f"Total Bridges :{total_bridges}")
             
             # Calculate broadcast domains in data link layer 
             # (each switch creates one domain, each hub shares a domain)
-            broadcast_domains = total_switches
-            if total_hubs > 0 or (total_devices > 0 and total_switches == 0):
+            broadcast_domains = total_switches + total_bridges
+            if total_hubs > 0 or (total_devices > 0 and total_switches + total_bridges== 0):
                 broadcast_domains += 1  # Add one domain for all connected hubs
             st.write(f"Total Broadcast Domains: {broadcast_domains}")
             
             # Calculate collision domains
             # In data link layer: switches create separate collision domains for each port
             # Count connections to switches plus one domain for each hub
-            collision_domains = 0
-            for switch in st.session_state.switches.values():
-                collision_domains += len(switch.connected_to)
-            collision_domains += total_hubs  # Each hub is one collision domain
+            
+            collision_domains = sum(len(switch.connected_to) for switch in st.session_state.switches.values())
+            collision_domains += sum(len(bridge.connected_to) for bridge in st.session_state.bridges.values())
+            collision_domains += total_hubs
             if collision_domains == 0 and total_devices > 0:
-                collision_domains = 1  # At least one collision domain if devices exist
+                collision_domains = 1
             st.write(f"Total Collision Domains: {collision_domains}")
+            
+            #collision_domains = 0
+            #for switch in st.session_state.switches.values():
+             #   collision_domains += len(switch.connected_to)
+            #collision_domains += total_hubs  # Each hub is one collision domain
+            #if collision_domains == 0 and total_devices > 0:
+             #   collision_domains = 1  # At least one collision domain if devices exist
+            #st.write(f"Total Collision Domains: {collision_domains}")
 
 # Add reset button at the bottom
 if st.button("Reset Network"):
-    for key in ['network', 'devices', 'hubs', 'switches', 'connections', 'messages', 'selected_layer']:
+    for key in ['network', 'devices', 'hubs', 'switches', 'bridges' ,'connections', 'messages', 'selected_layer']:
         if key in st.session_state:
             del st.session_state[key]
     st.rerun()
