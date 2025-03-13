@@ -1,7 +1,7 @@
 import networkx as nx
 import os
 from pyvis.network import Network as PyVisNetwork
-from core.devices import EndDevice, Hub, Switch
+from core.devices import EndDevice, Hub, Switch,Bridge
 import streamlit as st
 
 def visualize_topology(network, connections, highlight_path=None):
@@ -23,7 +23,10 @@ def visualize_topology(network, connections, highlight_path=None):
     # Add all connections to the graph
     for conn in connections:
         G.add_edge(conn[0].id, conn[1].id)
-    
+        
+    for bridge in network.bridges:
+        G.add_node(bridge.id, label=f"Bridge {bridge.id}", color='#8A2BE2', shape='triangle', title=f"Bridge: {bridge.id}")
+        
     # Highlight the path if data is being transferred
     if highlight_path:
         for i in range(len(highlight_path) - 1):
@@ -75,16 +78,21 @@ def restore_connections():
         # Ensure both entities are available
         if (isinstance(entity1, EndDevice) and entity1.id in st.session_state.devices) or \
            (isinstance(entity1, Hub) and entity1.id in st.session_state.hubs) or \
-           (isinstance(entity1, Switch) and entity1.id in st.session_state.switches):
+           (isinstance(entity1, Switch) and entity1.id in st.session_state.switches) or\
+           (isinstance(entity1, Bridge) and entity1.id in st.session_state.bridges): 
+                 
             if (isinstance(entity2, EndDevice) and entity2.id in st.session_state.devices) or \
                (isinstance(entity2, Hub) and entity2.id in st.session_state.hubs) or \
-               (isinstance(entity2, Switch) and entity2.id in st.session_state.switches):
-                
+               (isinstance(entity2, Switch) and entity2.id in st.session_state.switches) or\
+               (isinstance(entity2, Bridge) and entity2.id in st.session_state.bridges):
+                   
                 # Get the current instances
                 if isinstance(entity1, EndDevice):
                     entity1 = st.session_state.devices[entity1.id]
                 elif isinstance(entity1, Switch):
                     entity1 = st.session_state.switches[entity1.id]
+                elif isinstance(entity1, Bridge):
+                    entity1 = st.session_state.bridges[entity1.id]   
                 else:
                     entity1 = st.session_state.hubs[entity1.id]
                     
@@ -92,6 +100,8 @@ def restore_connections():
                     entity2 = st.session_state.devices[entity2.id]
                 elif isinstance(entity2, Switch):
                     entity2 = st.session_state.switches[entity2.id]
+                elif isinstance(entity2, Bridge):
+                    entity2 = st.session_state.bridges[entity2.id]    
                 else:
                     entity2 = st.session_state.hubs[entity2.id]
                 
