@@ -110,3 +110,31 @@ def restore_connections():
                     entity1.connect(entity2)
                 if entity1 not in entity2.connected_to:
                     entity2.connect(entity1)
+
+
+def initialize_session_state(Network):
+    if 'network' not in st.session_state:
+        st.session_state.network = Network()
+
+    # Store devices and hubs in session state
+    if 'devices' not in st.session_state:
+        st.session_state.devices = {}  # Store devices by ID
+    if 'hubs' not in st.session_state:
+        st.session_state.hubs = {}  # Store hubs by ID
+    if 'switches' not in st.session_state:
+        st.session_state.switches = {}  # Store switches by ID
+    if 'bridges' not in st.session_state:
+        st.session_state.bridges = {}  # Store bridges by ID
+
+    # Store connections in session state
+    if 'connections' not in st.session_state:
+        st.session_state.connections = []  # List of connections (entity1, entity2)
+
+    # Track transmitted messages
+    if 'messages' not in st.session_state:
+        st.session_state.messages = []  # List of transmitted messages
+
+    # Selected network layer (default to physical)
+    if 'selected_layer' not in st.session_state:
+        st.session_state.selected_layer = 1
+
