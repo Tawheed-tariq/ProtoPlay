@@ -63,47 +63,47 @@ def introduce_noise(data, probability=0.1):
             data_list[i] = '1' if data_list[i] == '0' else '0'
     return "".join(data_list)
 
-# Streamlit App
-st.title("🔍 CRC Error Detection ")
+def crc_error_detection():
+    st.title("🔍 CRC Error Detection ")
 
-st.subheader("📡 Sender Side")
-input_data = st.text_input("Enter Input Data (Binary)")
-divisor = st.text_input("Enter Generator Polynomial (Binary)")
+    st.subheader("📡 Sender Side")
+    input_data = st.text_input("Enter Input Data (Binary)")
+    divisor = st.text_input("Enter Generator Polynomial (Binary)")
 
-if st.button("Generate Codeword"):
-    if input_data and divisor:
-        crc = CRC()
-        crc.getdata(input_data, divisor)
-        st.success(f"Data to Send (with CRC): {crc.result}")
-        st.session_state["codeword"] = crc.result
-    else:
-        st.error("⚠️ Please enter both Input Data and Generator Polynomial")
-
-# Collapsible CRC Detection Section
-detection_section = st.expander("📥 CRC Detection Section", expanded=False)
-with detection_section:
-    use_generated_data = st.checkbox("Use Generated Codeword as Received Data")
-    
-    if use_generated_data and "codeword" in st.session_state:
-        data_received = st.session_state["codeword"]
-    else:
-        data_received = st.text_input("Enter Received Data (Binary)")
-    
-    add_noise = st.checkbox("Add Noise to Received Data")
-    if add_noise and data_received:
-        noise_probability = st.slider("Select Noise Probability", 0.0, 0.5, 0.1, 0.05)
-        data_received = introduce_noise(data_received, probability=noise_probability)
-        st.warning(f"🔀 Noisy Data Received: {data_received}")
-    
-    if st.button("Check for Errors"):
-        if data_received and divisor:
+    if st.button("Generate Codeword"):
+        if input_data and divisor:
             crc = CRC()
             crc.getdata(input_data, divisor)
-            error, is_correct = crc.receiver_side(data_received)
-            st.info(f"Remainder: {error}")
-            if is_correct:
-                st.success("✅ Correct Data Received Without Any Error")
-            else:
-                st.error("❌ Data Received Contains Errors")
+            st.success(f"Data to Send (with CRC): {crc.result}")
+            st.session_state["codeword"] = crc.result
         else:
-            st.error("⚠️ Please enter both Received Data and Generator Polynomial")
+            st.error("⚠️ Please enter both Input Data and Generator Polynomial")
+
+    # Collapsible CRC Detection Section
+    detection_section = st.expander("📥 CRC Detection Section", expanded=False)
+    with detection_section:
+        use_generated_data = st.checkbox("Use Generated Codeword as Received Data")
+        
+        if use_generated_data and "codeword" in st.session_state:
+            data_received = st.session_state["codeword"]
+        else:
+            data_received = st.text_input("Enter Received Data (Binary)")
+        
+        add_noise = st.checkbox("Add Noise to Received Data")
+        if add_noise and data_received:
+            noise_probability = st.slider("Select Noise Probability", 0.0, 0.5, 0.1, 0.05)
+            data_received = introduce_noise(data_received, probability=noise_probability)
+            st.warning(f"🔀 Noisy Data Received: {data_received}")
+        
+        if st.button("Check for Errors"):
+            if data_received and divisor:
+                crc = CRC()
+                crc.getdata(input_data, divisor)
+                error, is_correct = crc.receiver_side(data_received)
+                st.info(f"Remainder: {error}")
+                if is_correct:
+                    st.success("✅ Correct Data Received Without Any Error")
+                else:
+                    st.error("❌ Data Received Contains Errors")
+            else:
+                st.error("⚠️ Please enter both Received Data and Generator Polynomial")

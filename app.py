@@ -1,6 +1,7 @@
 import streamlit as st
 from core.csma_cd import csmaCD
 from core.layer_simulation import layerSimulation
+from crc.crc import crc_error_detection
 st.set_page_config(page_title="Network Simulator", layout="wide")
 
 st.title("Network Simulator")
@@ -40,7 +41,7 @@ if st.session_state.selected_layer:
 elif st.session_state.selected_simulation:
     selected_simulation = st.session_state.selected_simulation
     if selected_simulation == "CRC":
-        st.write("CRC Simulation")
+        crc_error_detection()
     elif selected_simulation == "CSMA/CD":
         csmaCD()
     else:
