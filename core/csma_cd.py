@@ -359,18 +359,26 @@ def csmaCD():
             event_html = "<div style='height: 800px; overflow-y: scroll; background-color: #f0f2f6; padding: 10px; border-radius: 5px;'>"
             
             for event in events:
-                if "Collision" in event:
-                    event_html += f"<p style='color: red; margin: 5px 0;'>⚡ {event}</p>"
-                elif "successfully transmitted" in event:
-                    event_html += f"<p style='color: green; margin: 5px 0;'>✓ {event}</p>"
-                elif "generated packet" in event:
-                    event_html += f"<p style='color: blue; margin: 5px 0;'>📦 {event}</p>"
-                elif "changed state" in event:
-                    event_html += f"<p style='color: purple; margin: 5px 0;'>🔄 {event}</p>"
-                elif "step" in event:
-                    event_html += f"<p style='color: orange; margin: 5px 0; font-weight: bold;'>{event}</p>"
-                else:
-                    event_html += f"<p style='color: black; margin: 5px 0;'>{event}</p>"
+                    if "Collision" in event:
+                        event_html += f"<p style='color: red; margin: 5px 0;'>⚡ {event}</p>"
+                    elif "successfully transmitted" in event:
+                        event_html += f"<p style='color: green; margin: 5px 0;'>✓ {event}</p>"
+                    elif "generated packet" in event:
+                        event_html += f"<p style='color: blue; margin: 5px 0;'>📦 {event}</p>"
+                    elif "changed state" in event:
+                        event_html += f"<p style='color: purple; margin: 5px 0;'>🔄 {event}</p>"
+                    elif "continuing transmission" in event:
+                        event_html += f"<p style='color: orange; margin: 5px 0;'>📡 {event}</p>"
+                    elif "Transmission progress" in event:
+                        event_html += f"<p style='color: teal; margin: 5px 0;'>⏱️ {event}</p>"
+                    elif "Channel state" in event:
+                        event_html += f"<p style='color: gray; margin: 5px 0;'>🔌 {event}</p>"
+                    elif "in BACKOFF state" in event:
+                        event_html += f"<p style='color: brown; margin: 5px 0;'>⏳ {event}</p>"
+                    elif event.startswith("---"):
+                        event_html += f"<p style='color: black; margin: 10px 0; font-weight: bold; border-top: 1px solid #ccc;'>{event}</p>"
+                    else:
+                        event_html += f"<p style='color: black; margin: 5px 0;'>{event}</p>"
             
             event_html += "</div>"
             st.markdown(event_html, unsafe_allow_html=True)
@@ -435,12 +443,18 @@ def csmaCD():
                         event_html += f"<p style='color: green; margin: 5px 0;'>✓ {event}</p>"
                     elif "generated packet" in event:
                         event_html += f"<p style='color: blue; margin: 5px 0;'>📦 {event}</p>"
-                    elif "started transmitting" in event:
-                        event_html += f"<p style='color: orange; margin: 5px 0;'>📡 {event}</p>"
                     elif "changed state" in event:
                         event_html += f"<p style='color: purple; margin: 5px 0;'>🔄 {event}</p>"
-                    elif "step" in event:
-                        event_html += f"<p style='color: orange; margin: 5px 0; font-weight: bold;'>{event}</p>"
+                    elif "continuing transmission" in event:
+                        event_html += f"<p style='color: orange; margin: 5px 0;'>📡 {event}</p>"
+                    elif "Transmission progress" in event:
+                        event_html += f"<p style='color: teal; margin: 5px 0;'>⏱️ {event}</p>"
+                    elif "Channel state" in event:
+                        event_html += f"<p style='color: gray; margin: 5px 0;'>🔌 {event}</p>"
+                    elif "in BACKOFF state" in event:
+                        event_html += f"<p style='color: brown; margin: 5px 0;'>⏳ {event}</p>"
+                    elif event.startswith("---"):
+                        event_html += f"<p style='color: black; margin: 10px 0; font-weight: bold; border-top: 1px solid #ccc;'>{event}</p>"
                     else:
                         event_html += f"<p style='color: black; margin: 5px 0;'>{event}</p>"
                 

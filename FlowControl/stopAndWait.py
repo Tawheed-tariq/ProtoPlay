@@ -100,7 +100,7 @@ def run_simulation(frame_count, plot_area, status_area, log_area, timeout, ack_l
     while st.session_state.current_frame < frame_count:
         current_frame = st.session_state.current_frame
         
-        frame_delivered = send_frame(current_frame, plot_area,frame_loss_prob, animation_speed)
+        frame_delivered = send_frame(current_frame, plot_area, frame_loss_prob, animation_speed)
         
         if frame_delivered:
             ack_received = send_ack(current_frame, plot_area, ack_loss_prob, animation_speed)
@@ -118,7 +118,8 @@ def run_simulation(frame_count, plot_area, status_area, log_area, timeout, ack_l
         progress = (st.session_state.current_frame / frame_count) * 100
         status_area.progress(int(progress))
         
-        log_area.text_area("Simulation Log", "\n".join(st.session_state.log), height=300)
+        # Update log area with styled HTML
+        display_styled_log(log_area)
         
         if not frame_delivered or not ack_received:
             add_log(f"Waiting for timeout ({timeout} seconds)...")
@@ -127,6 +128,36 @@ def run_simulation(frame_count, plot_area, status_area, log_area, timeout, ack_l
     add_log(f"Simulation complete! Total frames: {frame_count}, Retransmissions: {st.session_state.retransmissions}")
     st.session_state.simulation_complete = True
     st.session_state.simulation_running = False
+
+def display_styled_log(log_area):
+    events = st.session_state.log
+    event_html = "<div style='height: 500px; overflow-y: scroll; background-color: #f0f2f6; padding: 10px; border-radius: 5px;'>"
+    
+    for event in events:
+        if "xxxxxx" in event:  # Error messages
+            # Remove the prefix and clean up the message
+            clean_event = event.replace("xxxxxx ", "")
+            event_html += f"<p style='color: red; margin: 5px 0;'>❌ {clean_event}</p>"
+        elif "----->" in event:  # Success messages
+            clean_event = event.replace("-----> ", "")
+            event_html += f"<p style='color: green; margin: 5px 0;'>✓ {clean_event}</p>"
+        elif "Timeout" in event:
+            event_html += f"<p style='color: orange; margin: 5px 0;'>⏱️ {event.replace('****** ', '')}</p>"
+        elif "Frame" in event and "lost" in event.lower():
+            event_html += f"<p style='color: red; margin: 5px 0;'>⚡ {event.replace('****** ', '')}</p>"
+        elif "ACK" in event and "lost" in event.lower():
+            event_html += f"<p style='color: purple; margin: 5px 0;'>⚠️ {event.replace('****** ', '')}</p>"
+        elif "Sending Frame" in event:
+            event_html += f"<p style='color: blue; margin: 5px 0;'>📦 {event.replace('****** ', '')}</p>"
+        elif "Sending ACK" in event:
+            event_html += f"<p style='color: teal; margin: 5px 0;'>📡 {event.replace('****** ', '')}</p>"
+        elif "Simulation complete" in event:
+            event_html += f"<p style='color: black; margin: 10px 0; font-weight: bold; border-top: 1px solid #ccc;'>{event.replace('****** ', '')}</p>"
+        else:
+            event_html += f"<p style='color: gray; margin: 5px 0;'>ℹ️ {event.replace('****** ', '')}</p>"
+    
+    event_html += "</div>"
+    log_area.markdown(event_html, unsafe_allow_html=True)
 
 def stopAndWait():
     st.title("Stop-and-Wait ARQ Simulation")
