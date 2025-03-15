@@ -2,6 +2,7 @@ import streamlit as st
 from core.csma_cd import csmaCD
 from core.layer_simulation import layerSimulation
 from crc.crc import crc_error_detection
+from FlowControl.stopAndWait import stopAndWait
 st.set_page_config(page_title="Network Simulator", layout="wide")
 
 st.title("Network Simulator")
@@ -26,7 +27,7 @@ if selected_option == "Layer Selection":
     st.session_state.selected_layer = selected_layer
     st.session_state.selected_simulation = None
 else:
-    simulation_options = ["CRC", "CSMA/CD"]
+    simulation_options = ["CRC", "CSMA/CD", "Stop-and-Wait"]
     selected_simulation = st.sidebar.radio(
         "Select Simulation",
         simulation_options,
@@ -44,6 +45,8 @@ elif st.session_state.selected_simulation:
         crc_error_detection()
     elif selected_simulation == "CSMA/CD":
         csmaCD()
+    elif selected_simulation == "Stop-and-Wait":
+        stopAndWait()
     else:
         st.error("Invalid simulation selected.")
 else:
