@@ -143,13 +143,9 @@ def send_data(devices, layer_options, graph_placeholder):
     data = st.text_input("Data to send", "Hello, Network!")
     
     if st.button("Send Data"):
-        # Make sure we're using current objects
         source = st.session_state.devices[source.id]
         dest = st.session_state.devices[dest.id]
         
-        # Check if there's a valid path given the current layer
-        # In Layer 1, we can only connect if there's a physical path through devices and hubs
-        # In Layer 2+, we can also use switches
         valid_connections = []
         for conn in st.session_state.connections:
             # For Layer 1, exclude connections involving switches
@@ -161,16 +157,13 @@ def send_data(devices, layer_options, graph_placeholder):
                 # For Layer 2+, include all connections
                 valid_connections.append(conn)
         
-        # Find path between source and destination using valid connections
         path = find_path(source, dest, valid_connections)
         
         if path:
-            # Send data using selected layer
             layer = st.session_state.selected_layer
             sent = source.send(data, dest, layer=layer)
             
             if sent:
-                # Record the message
                 st.session_state.messages.append({
                     "source": source.id,
                     "destination": dest.id,
