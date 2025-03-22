@@ -64,9 +64,9 @@ def introduce_noise(data, probability=0.1):
     return "".join(data_list)
 
 def crc_error_detection():
-    st.title("🔍 CRC Error Detection ")
+    st.title("CRC Error Detection ")
 
-    st.subheader("📡 Sender Side")
+    st.subheader("Sender Side")
     input_data = st.text_input("Enter Input Data (Binary)")
     divisor = st.text_input("Enter Generator Polynomial (Binary)")
 
@@ -77,10 +77,10 @@ def crc_error_detection():
             st.success(f"Data to Send (with CRC): {crc.result}")
             st.session_state["codeword"] = crc.result
         else:
-            st.error("⚠️ Please enter both Input Data and Generator Polynomial")
+            st.error("Please enter both Input Data and Generator Polynomial")
 
     # Collapsible CRC Detection Section
-    detection_section = st.expander("📥 CRC Detection Section", expanded=False)
+    detection_section = st.expander("CRC Detection Section", expanded=False)
     with detection_section:
         use_generated_data = st.checkbox("Use Generated Codeword as Received Data")
         
@@ -93,7 +93,7 @@ def crc_error_detection():
         if add_noise and data_received:
             noise_probability = st.slider("Select Noise Probability", 0.0, 0.5, 0.1, 0.05)
             data_received = introduce_noise(data_received, probability=noise_probability)
-            st.warning(f"🔀 Noisy Data Received: {data_received}")
+            st.warning(f"Noisy Data Received: {data_received}")
         
         if st.button("Check for Errors"):
             if data_received and divisor:
@@ -102,8 +102,8 @@ def crc_error_detection():
                 error, is_correct = crc.receiver_side(data_received)
                 st.info(f"Remainder: {error}")
                 if is_correct:
-                    st.success("✅ Correct Data Received Without Any Error")
+                    st.success("Correct Data Received Without Any Error")
                 else:
-                    st.error("❌ Data Received Contains Errors")
+                    st.error("Data Received Contains Errors")
             else:
-                st.error("⚠️ Please enter both Received Data and Generator Polynomial")
+                st.error("Please enter both Received Data and Generator Polynomial")

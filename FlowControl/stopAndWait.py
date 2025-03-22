@@ -137,24 +137,24 @@ def display_styled_log(log_area):
         if "xxxxxx" in event:  # Error messages
             # Remove the prefix and clean up the message
             clean_event = event.replace("xxxxxx ", "")
-            event_html += f"<p style='color: red; margin: 5px 0;'>❌ {clean_event}</p>"
+            event_html += f"<p style='color: red; margin: 5px 0;'>{clean_event}</p>"
         elif "----->" in event:  # Success messages
             clean_event = event.replace("-----> ", "")
-            event_html += f"<p style='color: green; margin: 5px 0;'>✓ {clean_event}</p>"
+            event_html += f"<p style='color: green; margin: 5px 0;'>{clean_event}</p>"
         elif "Timeout" in event:
-            event_html += f"<p style='color: orange; margin: 5px 0;'>⏱️ {event.replace('****** ', '')}</p>"
+            event_html += f"<p style='color: orange; margin: 5px 0;'>{event.replace('****** ', '')}</p>"
         elif "Frame" in event and "lost" in event.lower():
-            event_html += f"<p style='color: red; margin: 5px 0;'>⚡ {event.replace('****** ', '')}</p>"
+            event_html += f"<p style='color: red; margin: 5px 0;'>{event.replace('****** ', '')}</p>"
         elif "ACK" in event and "lost" in event.lower():
-            event_html += f"<p style='color: purple; margin: 5px 0;'>⚠️ {event.replace('****** ', '')}</p>"
+            event_html += f"<p style='color: purple; margin: 5px 0;'>{event.replace('****** ', '')}</p>"
         elif "Sending Frame" in event:
-            event_html += f"<p style='color: blue; margin: 5px 0;'>📦 {event.replace('****** ', '')}</p>"
+            event_html += f"<p style='color: blue; margin: 5px 0;'>{event.replace('****** ', '')}</p>"
         elif "Sending ACK" in event:
-            event_html += f"<p style='color: teal; margin: 5px 0;'>📡 {event.replace('****** ', '')}</p>"
+            event_html += f"<p style='color: teal; margin: 5px 0;'>{event.replace('****** ', '')}</p>"
         elif "Simulation complete" in event:
             event_html += f"<p style='color: black; margin: 10px 0; font-weight: bold; border-top: 1px solid #ccc;'>{event.replace('****** ', '')}</p>"
         else:
-            event_html += f"<p style='color: gray; margin: 5px 0;'>ℹ️ {event.replace('****** ', '')}</p>"
+            event_html += f"<p style='color: gray; margin: 5px 0;'>{event.replace('****** ', '')}</p>"
     
     event_html += "</div>"
     log_area.markdown(event_html, unsafe_allow_html=True)

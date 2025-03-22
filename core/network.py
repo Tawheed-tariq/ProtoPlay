@@ -47,12 +47,3 @@ class Network:
         else:
             return False, "Connection failed"
             
-    def disconnect(self, entity1, entity2):
-        """Disconnect two entities in the network"""
-        entity1_disconnected = entity1.disconnect(entity2)
-        entity2_disconnected = entity2.disconnect(entity1)
-        
-        if entity1_disconnected and entity2_disconnected:
-            return True, f"Disconnected {entity1.id} and {entity2.id}"
-        else:
-            return False, "Disconnection failed"

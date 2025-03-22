@@ -238,20 +238,9 @@ def layerSimulation(selected_layer, layer_options):
                         st.write("**Current MAC Address Table:**")
                         for mac, port in selected_device.mac_table.items():
                             st.write(f"MAC: {mac} → Port: {port}")
-                        else:
-                            st.write("MAC table is empty.")
+                    else:
+                        st.write("MAC table is empty.")
                     
-                    # Option to clear MAC table
-                    if st.button("Clear MAC Table"):
-                        if hasattr(selected_device, 'clear_mac_table'):
-                            selected_device.clear_mac_table()
-                            if isinstance(selected_device, Switch):
-                                st.session_state.switches[selected_device.id] = selected_device
-                        elif isinstance(selected_device, Bridge):
-                            st.session_state.bridges[selected_device.id] = selected_device
-                            st.success(f"Cleared MAC table for : {selected_device.id}")
-                        else:
-                            st.error("This switch doesn't support clearing the MAC table.")
                 else:
                     st.info("Add at least one switch or bridge to use MAC table features.")
 

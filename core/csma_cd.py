@@ -360,17 +360,17 @@ def csmaCD():
             
             for event in events:
                     if "Collision" in event:
-                        event_html += f"<p style='color: red; margin: 5px 0;'>⚡ {event}</p>"
+                        event_html += f"<p style='color: red; margin: 5px 0;'>{event}</p>"
                     elif "successfully transmitted" in event:
-                        event_html += f"<p style='color: green; margin: 5px 0;'>✓ {event}</p>"
+                        event_html += f"<p style='color: green; margin: 5px 0;'>{event}</p>"
                     elif "generated packet" in event:
-                        event_html += f"<p style='color: blue; margin: 5px 0;'>📦 {event}</p>"
+                        event_html += f"<p style='color: blue; margin: 5px 0;'>{event}</p>"
                     elif "changed state" in event:
                         event_html += f"<p style='color: purple; margin: 5px 0;'>🔄 {event}</p>"
                     elif "continuing transmission" in event:
-                        event_html += f"<p style='color: orange; margin: 5px 0;'>📡 {event}</p>"
+                        event_html += f"<p style='color: orange; margin: 5px 0;'>{event}</p>"
                     elif "Transmission progress" in event:
-                        event_html += f"<p style='color: teal; margin: 5px 0;'>⏱️ {event}</p>"
+                        event_html += f"<p style='color: teal; margin: 5px 0;'>{event}</p>"
                     elif "Channel state" in event:
                         event_html += f"<p style='color: gray; margin: 5px 0;'>🔌 {event}</p>"
                     elif "in BACKOFF state" in event:
@@ -438,17 +438,17 @@ def csmaCD():
                 
                 for event in events:
                     if "Collision" in event:
-                        event_html += f"<p style='color: red; margin: 5px 0;'>⚡ {event}</p>"
+                        event_html += f"<p style='color: red; margin: 5px 0;'>{event}</p>"
                     elif "successfully transmitted" in event:
-                        event_html += f"<p style='color: green; margin: 5px 0;'>✓ {event}</p>"
+                        event_html += f"<p style='color: green; margin: 5px 0;'>{event}</p>"
                     elif "generated packet" in event:
-                        event_html += f"<p style='color: blue; margin: 5px 0;'>📦 {event}</p>"
+                        event_html += f"<p style='color: blue; margin: 5px 0;'>{event}</p>"
                     elif "changed state" in event:
                         event_html += f"<p style='color: purple; margin: 5px 0;'>🔄 {event}</p>"
                     elif "continuing transmission" in event:
-                        event_html += f"<p style='color: orange; margin: 5px 0;'>📡 {event}</p>"
+                        event_html += f"<p style='color: orange; margin: 5px 0;'>{event}</p>"
                     elif "Transmission progress" in event:
-                        event_html += f"<p style='color: teal; margin: 5px 0;'>⏱️ {event}</p>"
+                        event_html += f"<p style='color: teal; margin: 5px 0;'>{event}</p>"
                     elif "Channel state" in event:
                         event_html += f"<p style='color: gray; margin: 5px 0;'>🔌 {event}</p>"
                     elif "in BACKOFF state" in event:

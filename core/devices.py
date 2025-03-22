@@ -1,24 +1,14 @@
 class Entity:
-    """Base class for all network entities (devices, hubs)"""
     def __init__(self, id):
         self.id = id
-        self.connected_to = []  # List of connected entities
+        self.connected_to = []  
         
     def connect(self, entity):
-        """Connect this entity to another entity"""
         if entity not in self.connected_to:
             self.connected_to.append(entity)
             return True
         return False
     
-    def disconnect(self, entity):
-        """Disconnect this entity from another entity"""
-        if entity in self.connected_to:
-            self.connected_to.remove(entity)
-            return True
-        return False
-
-
 class EndDevice(Entity):
     def __init__(self, id, mac):
         super().__init__(id)
@@ -118,14 +108,12 @@ class Hub(Entity):
         return f"Hub(id={self.id})"
 
 class Switch(Entity):
-    """Represents a switch in the network that forwards frames based on MAC addresses"""
     def __init__(self, id):
         super().__init__(id)
         self.mac_table = {}
         self.port_table = {}
     
     def connect(self, entity):
-        """Connect this entity to another entity"""
         if entity not in self.connected_to:
             self.connected_to.append(entity)
             self.port_table[entity] = len(self.port_table)
@@ -163,30 +151,32 @@ class Switch(Entity):
         return f"Switch(id={self.id})"
 
 class Bridge(Entity):
-    """Represents a bridge in the network that filters and forwards frames between network segments"""
     def __init__(self, id):
         super().__init__(id)
-        self.mac_table = {}  # MAC address to port mapping
+        self.mac_table = {} 
+        self.port_table = {}
+    
+    def connect(self, entity):
+        if entity not in self.connected_to:
+            self.connected_to.append(entity)
+            self.port_table[entity] = len(self.port_table)
+            return True
+        return False 
     
     def forward(self, frame, source, destination=None, layer=2):
-        """
-        Forward frames based on MAC addresses, filtering traffic between segments
-        """
         if layer < 2:
             return False
 
         destination_mac = frame["dest_mac"]
 
-        # Learn the source MAC address and associate it with the source port
-        self.mac_table[frame["source_mac"]] = source
+        self.mac_table[frame["source_mac"]] = self.port_table[source]
 
-        # If the destination MAC is known, forward only to the correct port
         if destination_mac in self.mac_table:
-            destination_device = self.mac_table[destination_mac]
+            port = self.mac_table[destination_mac]
+            destination_device = self.connected_to[port]
             destination_device.receive(frame, source, layer=layer)
             return True
         else:
-            # Flood the frame only to the other segment
             success = False
             for device in self.connected_to:
                 if device != source:
