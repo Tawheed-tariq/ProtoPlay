@@ -18,13 +18,18 @@ class SlidingWindowProtocol:
         return False
 
     def receive_ack(self, ack_num):
-        if self.base <= ack_num < self.next_seq_num:
-            self.acknowledged[ack_num] = True
-            # Move base (sliding window) forward to the first unacknowledged frame
-            while self.base < self.next_seq_num and self.acknowledged[self.base]:
-                self.base += 1
-            return True
-        return False
+        if ack_num < self.base or ack_num >= self.next_seq_num:
+            return False  # Ignore invalid ACKs
+    
+        # Cumulative acknowledgment: mark all previous frames as acknowledged
+        for i in range(self.base, ack_num + 1):
+            self.acknowledged[i] = True
+
+        # Move base (sliding window) to the first unacknowledged frame
+        while self.base < self.next_seq_num and self.acknowledged[self.base]:
+            self.base += 1
+
+        return True
 
     def get_window(self):
         window_frames = []
@@ -54,6 +59,9 @@ def go_back_n():
         events = []
         timeouts = {}
         current_time = time.time()
+        
+        # Receiver's state
+        expected_seq_num = 0  # Next expected sequence number at receiver
 
         simulation_placeholder = st.empty()
         log_area = st.empty()
@@ -67,7 +75,7 @@ def go_back_n():
             # Check for timeouts - if base frame times out, resend all frames in window
             for frame_id in range(protocol.base, protocol.next_seq_num):
                 if frame_id in timeouts and current_time >= timeouts[frame_id] and not protocol.acknowledged[frame_id]:
-                    events.append(f"Timeout: Frame {frame_id} and all subsequent frames will be retransmitted")
+                    events.append(f"⚠️ Timeout: Frame {frame_id} lost, retransmitting all frames from {protocol.base}")
                     # Reset next_seq_num to base to resend all frames in window (Go-Back-N behavior)
                     protocol.next_seq_num = protocol.base
                     # Clear timeouts for frames that will be resent
@@ -79,37 +87,44 @@ def go_back_n():
             while protocol.next_seq_num < num_frames and protocol.next_seq_num < protocol.base + window_size:
                 frame_num = protocol.next_seq_num
                 if protocol.send_frame(frame_num):
-                    if random.random() > packet_loss_prob:
+                    frame_lost = random.random() <= packet_loss_prob
+                    if not frame_lost:
                         events.append(f"****** Sending Frame {frame_num}")
                         timeouts[frame_num] = current_time + timeout_interval
+                        
+                        # Correctly implement Go-Back-N receiver behavior
+                        if frame_num == expected_seq_num:
+                            # Frame received in order
+                            ack_lost = random.random() <= ack_loss_prob
+                            if not ack_lost:
+                                if protocol.receive_ack(frame_num):
+                                    events.append(f"-----> Received Acknowledgment for Frame {frame_num}")
+                                    timeouts.pop(frame_num, None)
+                                    # In Go-Back-N, receiver advances expected sequence number
+                                    expected_seq_num = frame_num + 1
+                            else:
+                                events.append(f"❌ ACK for Frame {frame_num} lost, waiting for timeout")
+                                # Expected sequence doesn't advance if ACK is lost
+                        else:
+                            # Properly handle out-of-order frames in Go-Back-N: discard without sending ACK
+                            events.append(f"❌ Frame {frame_num} received out of order, discarding (expected {expected_seq_num})")
                     else:
                         events.append(f"xxxxxx Frame {frame_num} lost during transmission")
                 else:
                     break
-            
-            # Process acknowledgments (simulate network delay)
-            for ack_num in range(protocol.base, protocol.next_seq_num):
-                if not protocol.acknowledged[ack_num]:
-                    if random.random() > ack_loss_prob:
-                        if protocol.receive_ack(ack_num):
-                            events.append(f"-----> Received Acknowledgment for Frame {ack_num}")
-                            timeouts.pop(ack_num, None)
-                    else:
-                        events.append(f"xxxxxx Acknowledgment for Frame {ack_num} lost")
-                    break  # Process one ACK at a time to simulate realistic behavior
             
             # Update UI
             progress = min(protocol.base / num_frames, 1.0)
             progress_bar.progress(progress)
 
             # Display current window state
-            # Replace the window_status section with this:
             window_status = f"""
                 <div style='background-color: rgba(30, 144, 255, 0.2); padding: 10px; border-radius: 5px; margin-bottom: 10px; border: 1px solid rgba(30, 144, 255, 0.4);'>
                     <h3 style='color: #1e90ff;'>Current Window Status:</h3>
                     <p><strong>Base (First unacknowledged):</strong> {protocol.base}</p>
                     <p><strong>Next sequence number:</strong> {protocol.next_seq_num}</p>
                     <p><strong>Window size:</strong> {window_size}</p>
+                    <p><strong>Receiver's expected sequence number:</strong> {expected_seq_num}</p>
                     <div style='display: flex; flex-wrap: wrap;'>
             """
 
