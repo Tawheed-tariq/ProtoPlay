@@ -118,7 +118,6 @@ def run_simulation(frame_count, plot_area, status_area, log_area, timeout, ack_l
         progress = (st.session_state.current_frame / frame_count) * 100
         status_area.progress(int(progress))
         
-        # Update log area with styled HTML
         display_styled_log(log_area)
         
         if not frame_delivered or not ack_received:

@@ -105,7 +105,6 @@ class Network:
         self.collision_rate = 0
         self.metrics_history = []
         
-    
     def update(self):
         self.current_time += 1
         self.history.append(f"--- Time step {self.current_time} ---")

@@ -5,9 +5,6 @@ from core.devices import EndDevice, Hub, Switch,Bridge
 import streamlit as st
 
 def visualize_topology(network, connections, highlight_path=None):
-    """
-    Generate the PyVis graph and return the HTML content.
-    """
     G = nx.Graph()
 
     # Add all devices and hubs to the graph
@@ -53,13 +50,8 @@ def visualize_topology(network, connections, highlight_path=None):
 
 
 def find_path(source, destination, connections):
-    """
-    Find the path between two devices in the network.
-    Returns a list of entity IDs representing the path.
-    """
     G = nx.Graph()
     
-    # Add all connections to the graph
     for conn in connections:
         G.add_edge(conn[0].id, conn[1].id)
 
@@ -70,7 +62,6 @@ def find_path(source, destination, connections):
         return None
 
 
-# Restore connections from session state - This is critical
 def restore_connections():
     for conn in st.session_state.connections:
         entity1, entity2 = conn

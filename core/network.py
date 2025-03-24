@@ -1,7 +1,6 @@
 from core.devices import EndDevice, Hub, Switch, Bridge
 
 class Network:
-    """Represents the entire network"""
     def __init__(self):
         self.devices = []
         self.hubs = []
@@ -9,35 +8,30 @@ class Network:
         self.bridges = []
         
     def add_device(self, device):
-        """Add a device to the network"""
         if device not in self.devices:
             self.devices.append(device)
             return True
         return False
     
     def add_hub(self, hub):
-        """Add a hub to the network"""
         if hub not in self.hubs:
             self.hubs.append(hub)
             return True
         return False
     
     def add_switch(self, switch):
-        """Add a switch to the network"""
         if switch not in self.switches:
             self.switches.append(switch)
             return True
         return False
     
     def add_bridge(self, bridge):
-        """Add a bridge to the network"""
         if bridge not in self.bridges:
             self.bridges.append(bridge)
             return True
         return False
 
     def connect(self, entity1, entity2):
-        """Connect two entities in the network"""
         entity1_connected = entity1.connect(entity2)
         entity2_connected = entity2.connect(entity1)
         

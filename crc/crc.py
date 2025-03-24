@@ -12,14 +12,12 @@ class CRC:
         self.len_inp = 0
 
     def fun_xor(self, a, b):
-        """Performs XOR operation between two binary strings"""
         if a[0] == '0':
             return a[1:]
         else:
             return "".join('0' if a[i] == b[i] else '1' for i in range(self.len_gen))[1:]
 
     def modulo_div(self):
-        """Performs the CRC division to get the remainder"""
         temp_div = self.divisor
         temp_divident = self.divident[:self.len_gen]
         j = self.len_gen
@@ -32,7 +30,6 @@ class CRC:
         self.result = self.input_data + self.fun_xor(temp_divident, temp_div)
 
     def getdata(self, input_data, divisor):
-        """Takes input data and generator polynomial"""
         self.input_data = input_data
         self.divisor = divisor
         self.len_gen = len(self.divisor)
@@ -42,7 +39,6 @@ class CRC:
         self.modulo_div()
 
     def receiver_side(self, data_rec):
-        """Simulates the receiver side for CRC error detection"""
         temp_div = self.divisor
         temp_divident = data_rec[:self.len_gen]
         j = self.len_gen
@@ -56,7 +52,6 @@ class CRC:
         return error, error == '0' * (self.len_gen - 1)
 
 def introduce_noise(data, probability=0.1):
-    """Randomly flips bits in the data based on probability"""
     data_list = list(data)
     for i in range(len(data_list)):
         if random.random() < probability:
