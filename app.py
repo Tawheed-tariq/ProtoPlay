@@ -1,5 +1,5 @@
 import streamlit as st
-from core.csma_cd import csmaCD
+from core.csma_main import csmaCD
 from core.layer_simulation import layerSimulation
 from crc.crc import crc_error_detection
 from FlowControl.stopAndWait import stopAndWait
