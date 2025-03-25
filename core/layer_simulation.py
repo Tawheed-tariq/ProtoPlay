@@ -398,16 +398,19 @@ def layerSimulation(selected_layer, layer_options):
                 st.write(f"Total Switches: {total_switches}")
                 st.write(f"Total Bridges :{total_bridges}")
                 
-                # Calculate broadcast domains in data link layer 
-                # (each switch creates one domain, each hub shares a domain)
-                broadcast_domains = total_switches + total_bridges
-                if total_hubs > 0 or (total_devices > 0 and total_switches + total_bridges== 0):
-                    broadcast_domains += 1  # Add one domain for all connected hubs
+                broadcast_domains = 0
+                broadcast_domains += total_switches
+                
+                if total_bridges > 0:
+                    broadcast_domains += 1
+                
+                if total_hubs > 0:
+                    broadcast_domains = max(1, broadcast_domains)
                 st.write(f"Total Broadcast Domains: {broadcast_domains}")
                 
                 
-                collision_domains = sum(len(switch.connected_to) for switch in st.session_state.switches.values())
-                collision_domains += sum(len(bridge.connected_to) for bridge in st.session_state.bridges.values())
+                collision_domains = sum(len([conn for conn in switch.connected_to if not isinstance(conn, Hub)]) for switch in st.session_state.switches.values())
+                collision_domains += sum(len([conn for conn in bridge.connected_to if not isinstance(conn, Hub)]) for bridge in st.session_state.bridges.values())
                 collision_domains += total_hubs
                 if collision_domains == 0 and total_devices > 0:
                     collision_domains = 1
