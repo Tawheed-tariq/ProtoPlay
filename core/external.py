@@ -65,59 +65,50 @@ def create_prebuilt_network(network_type):
             return False
     
     elif network_type == "router_network":
-        # Create a more advanced network with a router, switch, and multiple devices
         try:
-            # Create router
             router = Router("Router1")
             st.session_state.routers["Router1"] = router
             st.session_state.network.add_router(router)
             
-            # Add router interface
             router.add_interface("eth0", "192.168.1.1", "00:1A:2B:3C:4D:01", "255.255.255.0")
             router.add_interface("eth1", "192.168.2.1", "00:1A:2B:3C:4D:02", "255.255.255.0")
             
-            # Create switch
             switch = Switch("Switch1")
             st.session_state.switches["Switch1"] = switch
             st.session_state.network.add_switch(switch)
 
-            # Connect router to switch
             router.connect(switch, "eth0")
             switch.port_table[router] = len(switch.port_table)
             switch.set_port_vlan(router, 1)
             st.session_state.connections.append((router, switch))
                         
-            # Create devices
             for i in range(1, 5):
                 device_id = f"PC{i}"
                 mac = f"00:1A:2B:3C:4D:{10+i:02d}"
                 ip = f"192.168.1.{10+i}"
                 device = EndDevice(device_id, mac, ip, "255.255.255.0")
-                device.set_gateway("192.168.1.1")  # Set router as gateway
+                device.set_gateway("192.168.1.1")  
                 st.session_state.devices[device_id] = device
                 st.session_state.network.add_device(device)
                 switch.connect(device)
                 st.session_state.connections.append((switch, device))
 
             
-            # Create switch
             switch2 = Switch("Switch2")
             st.session_state.switches["Switch2"] = switch2
             st.session_state.network.add_switch(switch2)
 
-            # Connect router to switch
             router.connect(switch2, "eth1")
             switch2.port_table[router] = len(switch2.port_table)
             switch2.set_port_vlan(router, 1)
             st.session_state.connections.append((router, switch2))
                         
-            # Create devices
             for i in range(5, 10):
                 device_id = f"PC{i}"
                 mac = f"00:1A:2B:3C:4D:{10+i:02d}"
                 ip = f"192.168.2.{10+i}"
                 device = EndDevice(device_id, mac, ip, "255.255.255.0")
-                device.set_gateway("192.168.2.1")  # Set router as gateway
+                device.set_gateway("192.168.2.1")  
                 st.session_state.devices[device_id] = device
                 st.session_state.network.add_device(device)
                 switch2.connect(device)
@@ -126,6 +117,27 @@ def create_prebuilt_network(network_type):
             st.success("Router Network created successfully!")
             return True
             
+        except Exception as e:
+            st.error(f"Error creating router network: {str(e)}")
+            return False
+    elif network_type == "hop_router_network":
+        try:
+            router1 = Router("Router1")
+            st.session_state.routers["Router1"] = router1
+            st.session_state.network.add_router(router1)
+
+            router1.add_interface("eth0", "192.168.1.1", "00:1A:2B:3C:4D:01", "255.255.255.0")
+            router1.add_interface("eth1", "192.168.2.1", "00:1A:2B:3C:4D:02", "255.255.255.0")
+
+            router2 = Router("Router2")
+            st.session_state.routers["Router2"] = router2
+            st.session_state.network.add_router(router2)
+
+            router3 = Router("Router3")
+            st.session_state.routers["Router3"] = router3
+            st.session_state.network.add_router(router3)
+
+
         except Exception as e:
             st.error(f"Error creating router network: {str(e)}")
             return False
@@ -142,14 +154,19 @@ def prebuilt_network_ui():
         if st.button("Create Basic Hub-Switch Network"):
             if create_prebuilt_network("basic_hub_switch"):
                 st.rerun()
+        if st.button("Hop Router Netwrok"):
+            if create_prebuilt_network("hop_router_network"):
+                st.rerun()
     
     with col2:
         if st.button("Create Router Network"):
             if create_prebuilt_network("router_network"):
                 st.rerun()
     
+    
     st.markdown("""
     **Prebuilt Network Options:**
     - **Basic Hub-Switch Network**: 2 hubs connected to a switch, each with 3 devices
     - **Router Network**: Router connected to a switch with 4 devices
+    - **Hop Router Network**: 3 Routers Connected to each other and two end routers connected to switches and each swithc connected to 2 devices.
     """)
