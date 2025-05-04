@@ -308,7 +308,7 @@ class Switch(Entity):
         return False
     
     def set_port_vlan(self, entity, vlan):
-        print(f"\n\n\nport table: {self.port_table.items()}")
+        # print(f"\n\n\nport table: {self.port_table.items()}")
         """Set VLAN for a specific port"""
         if entity in self.port_table:
             port = self.port_table[entity]
@@ -600,14 +600,15 @@ class Router(Entity):
                 return False
         return True
     
-    def connect(self, entity, interface_name):
+    def connect(self, entity, interface_name, another_router_interface=None):
         """Connect a device to a specific interface"""
         if entity not in self.connected_to and interface_name in self.interfaces:
             self.connected_to.append(entity)
-            entity.connected_to.append(self)  # Bidirectional connection
+            entity.connected_to.append(self)  
             self.port_table[entity] = interface_name
+            if isinstance(entity, Router):
+                entity.port_table[self] = another_router_interface
             
-            # If it's an EndDevice, set its gateway to this interface's IP
             if isinstance(entity, EndDevice):
                 entity.set_gateway(self.interfaces[interface_name]['ip'])
                 
@@ -702,10 +703,9 @@ class Router(Entity):
             if route:
                 outgoing_interface = route['interface']
                 next_hop = route['next_hop']
-                
+                print(f"\nRouter {self.id}: forwarding to {next_hop} via {outgoing_interface}\n")
                 # If no next hop specified, the destination is directly connected
                 if not next_hop:
-                    # Try to find directly connected device with matching IP
                     print(f"\n\nRouter {self.id}: port table: {self.port_table.items()}\n\n")
                     for device, interface in self.port_table.items():
                         if interface == outgoing_interface:
@@ -729,21 +729,23 @@ class Router(Entity):
                                 visited_copy = visited.copy()
                                 return device.forward(frame, self, destination, layer=2, visited=visited_copy)
                 
-                # Forward to the next hop router
                 else:
-                    # Find the next hop device
                     next_hop_device = None
                     next_hop_mac = None
-                    
+
                     # First check direct connections
+                    print(f"\n\nRouter {self.id}: port table: {self.port_table.items()}\n\n")
                     for device, interface in self.port_table.items():
                         if interface == outgoing_interface:
                             if isinstance(device, Router):
+                                # Check if any of this router's interfaces matches the next hop
                                 for intf_name, intf_details in device.interfaces.items():
                                     if intf_details['ip'] == next_hop:
                                         next_hop_device = device
                                         next_hop_mac = intf_details['mac']
                                         break
+                                if next_hop_device:  # If found, no need to check other devices
+                                    break
                             elif isinstance(device, (Switch, Hub, Bridge)) and device.id not in visited:
                                 # Create frame for next hop with broadcast MAC initially
                                 frame = {
