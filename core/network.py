@@ -1,4 +1,4 @@
-from core.devices import EndDevice, Hub, Switch, Bridge
+from core.devices import EndDevice, Hub, Switch, Bridge, Router
 
 class Network:
     def __init__(self):
@@ -6,6 +6,7 @@ class Network:
         self.hubs = []
         self.switches = []
         self.bridges = []
+        self.routers = []
         
     def add_device(self, device):
         if device not in self.devices:
@@ -28,6 +29,12 @@ class Network:
     def add_bridge(self, bridge):
         if bridge not in self.bridges:
             self.bridges.append(bridge)
+            return True
+        return False
+
+    def add_router(self, router):
+        if router not in self.routers:
+            self.routers.append(router)
             return True
         return False
 
