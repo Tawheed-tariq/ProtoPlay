@@ -1,0 +1,64 @@
+{
+    "updateTime": 20,
+    "timeoutTime": 180,
+    "garbageTime": 120,
+    "routes":
+    [
+        {
+            "prefix":       "155.13.55.0",
+            "prefixLen":    24,
+            "nextHop":      "192.168.223.1",
+            "metric":       15,
+            "routeTag":     0
+        },
+        {
+            "prefix":       "155.13.1.0",
+            "prefixLen":    24,
+            "nextHop":      "192.168.223.1",
+            "metric":       1,
+            "routeTag":     0
+        },
+        {
+            "prefix":       "160.15.2.0",
+            "prefixLen":    24,
+            "nextHop":      "192.168.223.1",
+            "metric":       2,
+            "routeTag":     1
+        },
+        {
+            "prefix":       "160.16.1.0",
+            "prefixLen":    24,
+            "nextHop":      "192.168.223.1",
+            "metric":       14,
+            "routeTag":     2
+        },
+        {
+            "prefix":       "196.55.0.0",
+            "prefixLen":    17,
+            "nextHop":      "192.168.223.1",
+            "metric":       19,
+            "routeTag":     0
+        },
+        {
+            "prefix": "10.0.0.0",
+            "prefixLen": 8,
+            "nextHop": "192.168.1.1",
+            "metric": 1,
+            "routeTag": 0
+        },
+        {
+            "prefix": "10.1.0.0",
+            "prefixLen": 16,
+            "nextHop": "192.168.1.2",
+            "metric": 2,
+            "routeTag": 0
+        },
+        {
+            "prefix": "10.1.1.0",
+            "prefixLen": 24,
+            "nextHop": "192.168.1.3",
+            "metric": 3,
+            "routeTag": 0
+        }
+    ]
+}
