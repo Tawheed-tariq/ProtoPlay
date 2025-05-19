@@ -210,7 +210,6 @@ class RIP(DatagramProtocol):
     def getUpdateTime(self):
         return self.updateTime + (random.random()*2-1)*self.updateTime*self.jitterScale
 
-    # TODO
     def respondToRequest(self, routes, addr):
         pkt = RipPacket(RIP_COMMAND_RESPONSE, 2)
         for r in routes:
