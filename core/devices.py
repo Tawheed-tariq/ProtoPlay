@@ -9,15 +9,7 @@ class Entity:
             entity.connected_to.append(self)  # Bidirectional connection
             return True
         return False
-    
-    def disconnect(self, entity):
-        if entity in self.connected_to:
-            self.connected_to.remove(entity)
-            if self in entity.connected_to:
-                entity.connected_to.remove(self)
-            return True
-        return False
-        
+            
     def __str__(self):
         return f"{self.__class__.__name__}(id={self.id})"
 
@@ -28,8 +20,8 @@ class EndDevice(Entity):
         self.ip = ip_address
         self.subnet_mask = subnet_mask
         self.default_gateway = default_gateway
-        self.received_data = []  # Store received data
-        self.arp_table = {}  # MAC to IP mapping
+        self.received_data = []  
+        self.arp_table = {}  
         
     def set_gateway(self, gateway_ip):
         self.default_gateway = gateway_ip
@@ -53,7 +45,6 @@ class EndDevice(Entity):
         if visited is None:
             visited = set()
         
-        # Add the ID to visited set
         visited.add(self.id)
         print(f"Device {self.id} sending data to {destination.id} at layer {layer}")
         
@@ -95,7 +86,7 @@ class EndDevice(Entity):
             packet = {
                 'source_ip': self.ip,
                 'dest_ip': dest_ip,
-                'ttl': 64,  # Time to live
+                'ttl': 64, 
                 'data': data
             }
 
@@ -140,7 +131,6 @@ class EndDevice(Entity):
                         gateway_device = entity
                         break
                     elif isinstance(entity, (Hub, Switch, Bridge)):
-                        # Check if this intermediary network device can reach the gateway
                         for connected_entity in entity.connected_to:
                             print(f"Checking connected entity {connected_entity} for gateway {self.default_gateway}")
                             if isinstance(connected_entity, Router) and connected_entity.has_ip(self.default_gateway):
@@ -202,13 +192,10 @@ class EndDevice(Entity):
                 
                 print(f"Device {self.id} received frame: src={source_mac}, dst={destination_mac}")
                 
-                # Update ARP table if IP info is present
                 if 'data' in data and isinstance(data['data'], dict) and 'source_ip' in data['data']:
                     self.arp_table[data['data']['source_ip']] = source_mac
                 
-                # Check if the frame is intended for this device
-                if destination_mac == self.mac or destination_mac == "FF:FF:FF:FF:FF:FF":  # Unicast or broadcast
-                    # If it's an IPv4 packet, process at layer 3
+                if destination_mac == self.mac or destination_mac == "FF:FF:FF:FF:FF:FF": 
                     if 'type' in data and data['type'] == 'IPv4':
                         return self.receive(data['data'], source, layer=3)
                     else:
@@ -219,15 +206,14 @@ class EndDevice(Entity):
                         })
                         return True
                 else:
-                    return False  # Not for this device
+                    return False  
             return False
             
         # Layer 3 - Network layer (IP addressing)
         elif layer == 3:
-            if 'dest_ip' in data:  # It's an IP packet
+            if 'dest_ip' in data:  
                 destination_ip = data['dest_ip']
                 
-                # Check if packet is intended for this device
                 if destination_ip == self.ip:
                     self.received_data.append({
                         "layer": 3,
@@ -254,14 +240,12 @@ class Hub(Entity):
         if visited is None:
             visited = set()
             
-        # Add self ID to visited
         visited.add(self.id)
         print(f"Hub {self.id} forwarding data from {source.id}")
         
         success = False
         
         for device in self.connected_to:
-            # Skip the source device and visited devices
             if device == source or device.id in visited:
                 continue
             
@@ -291,14 +275,12 @@ class Switch(Entity):
         """Connect a device to a specific port with optional VLAN assignment"""
         if entity not in self.connected_to:
             self.connected_to.append(entity)
-            entity.connected_to.append(self)  # Bidirectional connection
+            entity.connected_to.append(self)  
             
-            # Assign port number
             if port is None:
                 port = len(self.port_table)
             self.port_table[entity] = port
             
-            # Assign VLAN
             if vlan is not None:
                 self.vlan_table[port] = vlan
             else:
@@ -308,7 +290,6 @@ class Switch(Entity):
         return False
     
     def set_port_vlan(self, entity, vlan):
-        # print(f"\n\n\nport table: {self.port_table.items()}")
         """Set VLAN for a specific port"""
         if entity in self.port_table:
             port = self.port_table[entity]
@@ -321,10 +302,8 @@ class Switch(Entity):
         if visited is None:
             visited = set()
             
-        # Add self ID to visited
         visited.add(self.id)
         
-        # Layer 1 data - forward like a hub
         if layer < 2:
             return self._flood(frame, source, destination, visited)
             
@@ -347,15 +326,12 @@ class Switch(Entity):
             if destination_mac == "FF:FF:FF:FF:FF:FF":
                 return self._flood_vlan(frame, source, destination, source_vlan, visited)
             
-            # Unicast frame - check if destination MAC is in our table
             if destination_mac in self.mac_table:
                 print(f"Switch {self.id} found destination MAC {destination_mac} in table")
                 dest_port = self.mac_table[destination_mac]
                 dest_vlan = self.vlan_table.get(dest_port, self.default_vlan)
                 
-                # Check if both ports are in the same VLAN
                 if source_port is not None and dest_vlan == source_vlan:
-                    # Find the device connected to this port
                     for device, port in self.port_table.items():
                         if port == dest_port:
                             if device == destination or destination is None:
@@ -365,10 +341,8 @@ class Switch(Entity):
                                 visited_copy = visited.copy()
                                 return device.forward(frame, self, destination, layer=layer, visited=visited_copy)
             
-            # Unknown destination or different VLAN - flood within the same VLAN
             return self._flood_vlan(frame, source, destination, source_vlan, visited)
         else:
-            # Handle data without MAC addresses (shouldn't normally happen)
             return self._flood(frame, source, destination, visited)
     
     def _flood(self, data, source, destination=None, visited=None):
@@ -445,15 +419,14 @@ class Switch(Entity):
 class Bridge(Entity):
     def __init__(self, id):
         super().__init__(id)
-        self.mac_table = {}  # MAC address → port mapping
-        self.port_table = {}  # Entity → port number mapping
+        self.mac_table = {}  
+        self.port_table = {}  
     
     def connect(self, entity, port=None):
         if entity not in self.connected_to:
             self.connected_to.append(entity)
-            entity.connected_to.append(self)  # Bidirectional connection
+            entity.connected_to.append(self)  
             
-            # Assign port number
             if port is None:
                 port = len(self.port_table)
             self.port_table[entity] = port
@@ -465,13 +438,11 @@ class Bridge(Entity):
         if visited is None:
             visited = set()
             
-        # Add self ID to visited
         visited.add(self.id)
         
         if layer < 2:
-            return False  # Bridges don't forward layer 1 data
+            return False  
 
-        # Update MAC table with source address
         if 'source_mac' in frame:
             source_mac = frame["source_mac"]
             source_port = self.port_table.get(source)
@@ -481,15 +452,12 @@ class Bridge(Entity):
             
             destination_mac = frame["dest_mac"]
             
-            # Broadcast frame
             if destination_mac == "FF:FF:FF:FF:FF:FF":
                 return self._flood(frame, source, destination, visited)
             
-            # Unicast frame - check if destination MAC is in our table
             if destination_mac in self.mac_table:
                 dest_port = self.mac_table[destination_mac]
                 
-                # Find the device connected to this port
                 for device, port in self.port_table.items():
                     if port == dest_port:
                         if device == destination or destination is None:
@@ -498,10 +466,8 @@ class Bridge(Entity):
                             visited_copy = visited.copy()
                             return device.forward(frame, self, destination, layer=layer, visited=visited_copy)
             
-            # Unknown destination - flood
             return self._flood(frame, source, destination, visited)
         else:
-            # Handle data without MAC addresses (shouldn't normally happen)
             return self._flood(frame, source, destination, visited)
     
     def _flood(self, data, source, destination=None, visited=None):
@@ -530,10 +496,10 @@ class Router(Entity):
         super().__init__(id)
         self.interfaces = {}  # Interface name → {ip, mac, subnet} 
         self.routing_table = []  # [{network, subnet_mask, next_hop, interface}, ...]
-        self.port_table = {}  # Entity → interface mapping
-        self.arp_table = {}  # IP → MAC mapping
-        self.nat_table = {}  # For NAT functionality
-        self.public_ip = None  # For internet connectivity
+        self.port_table = {}  
+        self.arp_table = {}  
+        self.nat_table = {}  
+        self.public_ip = None  
     
     def add_interface(self, name, ip_address, mac_address, subnet_mask="255.255.255.0"):
         """Add a network interface to the router"""
@@ -543,7 +509,6 @@ class Router(Entity):
             'subnet_mask': subnet_mask
         }
         
-        # Add a direct route for this network
         network = self._get_network(ip_address, subnet_mask)
         self.add_route(network, subnet_mask, None, name)
         
@@ -620,7 +585,7 @@ class Router(Entity):
         self.routing_table.append({
             'network': network,
             'subnet_mask': subnet_mask,
-            'next_hop': next_hop,  # None for directly connected networks
+            'next_hop': next_hop,  
             'interface': interface
         })
         return True
@@ -660,7 +625,7 @@ class Router(Entity):
                 mask_int = int(mask_parts[i])
                 mask_bit_count += bin(mask_int).count('1')
                 
-                if mask_int == 0:  # This octet doesn't matter
+                if mask_int == 0:  
                     continue
                 
                 if (int(ip_parts[i]) & mask_int) != int(net_parts[i]):
@@ -678,14 +643,11 @@ class Router(Entity):
         if visited is None:
             visited = set()
             
-        # Add self ID to visited
         visited.add(self.id)
         
-        # For layer 2 frames
         if layer == 2 and isinstance(packet, dict) and 'type' in packet and packet['type'] == 'IPv4':
             return self.receive(packet, source, layer)
         
-        # For layer 3 packets
         if layer == 3 and isinstance(packet, dict) and 'dest_ip' in packet:
             print(f"\nRouter {self.id} processing packet: {packet} at layer {layer}\n")
             dest_ip = packet['dest_ip']
@@ -760,11 +722,9 @@ class Router(Entity):
                                 if next_hop_mac:
                                     frame['dest_mac'] = next_hop_mac
                                 
-                                # Forward through the connected network device
                                 visited_copy = visited.copy()
                                 return device.forward(frame, self, None, layer=2, visited=visited_copy)
                     
-                    # If we have a direct connection to the next hop router
                     if next_hop_device and next_hop_mac:
                         # Create frame for the next hop router
                         frame = {
@@ -776,7 +736,6 @@ class Router(Entity):
                         
                         return next_hop_device.receive(frame, self, layer=2)
             
-            # No route found
             print(f"Router {self.id}: No route to {dest_ip}")
             return False
             
@@ -784,20 +743,15 @@ class Router(Entity):
     
     def receive(self, frame, source, layer=2):
         """Process incoming frames/packets"""
-        # Layer 2 processing
         if layer == 2 and isinstance(frame, dict) and 'type' in frame and frame['type'] == 'IPv4':
-            # Extract the packet
             packet = frame['data']
             dest_ip = packet['dest_ip']
             
-            # Check if packet is destined for one of our interfaces
             for interface_name, interface in self.interfaces.items():
                 if packet['dest_ip'] == interface['ip']:
-                    # Packet for the router itself
                     print(f"Router {self.id}: Received packet for interface {interface_name}")
                     return True
             
-            # Forward the packet
             return self.forward(packet, source, layer=3)
         
         return False

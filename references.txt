@@ -7,3 +7,7 @@ https://pyvis.readthedocs.io/en/latest/
 https://networkx.org/
 
 https://claude.ai/
+
+https://github.com/NetFPGA/NetFPGA-public
+
+https://github.com/puetsua/pyRIP

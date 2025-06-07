@@ -2,7 +2,7 @@ import socket, struct
 
 # useful marcos
 RIP_MULTICAST_ADDR      = '224.0.0.9'
-RIP_UDP_PORT            = 520
+RIP_UDP_PORT            = 10520
 
 RIP_COMMAND_REQUEST     = 1
 RIP_COMMAND_RESPONSE    = 2
