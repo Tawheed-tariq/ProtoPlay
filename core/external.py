@@ -1,5 +1,5 @@
 import streamlit as st
-from core.devices import EndDevice, Hub, Switch, Bridge, Router
+from core.devices import EndDevice, Hub, Switch, Bridge, Router, http_handler, dns_handler, ftp_handler
 from core.network import Network
 import time
 from core.functions import visualize_topology, find_path, restore_connections, initialize_session_state
@@ -15,14 +15,11 @@ def create_prebuilt_network(network_type):
     initialize_session_state(Network)
     
     if network_type == "basic_hub_switch":
-        # Create a basic network with 2 hubs connected to a switch, each with 3 devices
         try:
-            # Create switch
             switch = Switch("Switch1")
             st.session_state.switches["Switch1"] = switch
             st.session_state.network.add_switch(switch)
             
-            # Create hubs
             hub1 = Hub("Hub1")
             hub2 = Hub("Hub2")
             st.session_state.hubs["Hub1"] = hub1
@@ -30,12 +27,10 @@ def create_prebuilt_network(network_type):
             st.session_state.network.add_hub(hub1)
             st.session_state.network.add_hub(hub2)
             
-            # Connect hubs to switch
             switch.connect(hub1)
             switch.connect(hub2)
             st.session_state.connections.extend([(switch, hub1), (switch, hub2)])
             
-            # Create devices for Hub1
             for i in range(1, 4):
                 device_id = f"PC{i}"
                 mac = f"00:1A:2B:3C:4D:{i:02d}"
@@ -46,12 +41,12 @@ def create_prebuilt_network(network_type):
                 hub1.connect(device)
                 st.session_state.connections.append((hub1, device))
             
-            # Create devices for Hub2
             for i in range(4, 7):
                 device_id = f"PC{i}"
                 mac = f"00:1A:2B:3C:4D:{i:02d}"
                 ip = f"192.168.1.{i}"
                 device = EndDevice(device_id, mac, ip, "255.255.255.0")
+                device.assign_port(80, 'tcp', 'http', http_handler)
                 st.session_state.devices[device_id] = device
                 st.session_state.network.add_device(device)
                 hub2.connect(device)

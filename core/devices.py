@@ -1,3 +1,7 @@
+import random
+from collections import defaultdict
+import time
+
 class Entity:
     def __init__(self, id):
         self.id = id
@@ -22,6 +26,8 @@ class EndDevice(Entity):
         self.default_gateway = default_gateway
         self.received_data = []  
         self.arp_table = {}  
+        self.ports = {}  # port_num -> {"protocol", "service", "handler"}
+        self.connections = defaultdict(dict)  # (ip, port) -> connection state
         
     def set_gateway(self, gateway_ip):
         self.default_gateway = gateway_ip
@@ -40,13 +46,97 @@ class EndDevice(Entity):
                 return False
         return True
     
+    def assign_port(self, port_num, protocol, service_name, handler=None):
+        """Assign a well-known port to a service"""
+        if port_num in self.ports:
+            return False
+        
+        self.ports[port_num] = {
+            "protocol": protocol,
+            "service": service_name,
+            "handler": handler
+        }
+        return True
+    
+    def get_ephemeral_port(self):
+        """Get a random ephemeral port (49152-65535)"""
+        used_ports = set(self.ports.keys())
+        while True:
+            port = random.randint(49152, 65535)
+            if port not in used_ports:
+                return port
+    
+    def tcp_handshake(self, src_port, dest_device, dest_port):
+        """Simulate TCP 3-way handshake"""
+        # SYN
+        self.log_message(dest_device, 
+                        f"SYN (seq={random.randint(1000, 9999)})", 
+                        src_port, dest_port, "tcp")
+        
+        # SYN-ACK
+        dest_device.log_message(self,
+                               f"SYN-ACK (seq={random.randint(1000, 9999)}, ack={random.randint(1000, 9999)})", 
+                               dest_port, src_port, "tcp")
+        
+        # ACK
+        self.log_message(dest_device,
+                        f"ACK (seq={random.randint(1000, 9999)}, ack={random.randint(1000, 9999)})", 
+                        src_port, dest_port, "tcp")
+        
+        return True
+    
+    def send_data(self, dest_device, data, protocol="tcp", dest_port=80):
+        """Send data between devices at transport layer"""
+        if dest_device not in self.connected_to and not self.same_subnet(dest_device.ip):
+            # Need to route through network layer
+            return self.send(data, dest_device, layer=3)
+            
+        src_port = self.get_ephemeral_port()
+        
+        # Check if destination port is open
+        if dest_port not in dest_device.ports:
+            self.log_message(dest_device,
+                           f"Connection refused (port {dest_port} closed)", 
+                           src_port, dest_port, protocol)
+            return False
+        
+        # For TCP, simulate 3-way handshake
+        if protocol.lower() == "tcp":
+            if not self.tcp_handshake(src_port, dest_device, dest_port):
+                return False
+        
+        # Send actual data
+        service = dest_device.ports[dest_port]
+        if service['handler']:
+            response = service['handler'](data)
+            self.log_message(dest_device, data, src_port, dest_port, protocol)
+            
+            if response:
+                dest_device.log_message(self, response, dest_port, src_port, protocol)
+        else:
+            self.log_message(dest_device, data, src_port, dest_port, protocol)
+        
+        return True
+    
+    def log_message(self, dest, data, src_port=None, dest_port=None, protocol=None):
+        """Record a message between devices"""
+        self.received_data.append({
+            "timestamp": time.strftime("%H:%M:%S"),
+            "source": self.id,
+            "destination": dest.id,
+            "data": data,
+            "source_port": src_port,
+            "dest_port": dest_port,
+            "protocol": protocol,
+            "layer": 4 if protocol else 5
+        })
+    
     def send(self, data, destination, layer=3, visited=None):
-        """Send data to a destination device"""
+        """Send data to a destination device at network/data link layer"""
         if visited is None:
             visited = set()
         
         visited.add(self.id)
-        print(f"Device {self.id} sending data to {destination.id} at layer {layer}")
         
         # For Layer 1 sending
         if layer == 1:
@@ -90,8 +180,6 @@ class EndDevice(Entity):
                 'data': data
             }
 
-            print(f"Packet created: src={self.ip}, dst={dest_ip}, data={data}")
-            
             # Direct connection or same subnet
             if destination in self.connected_to or self.same_subnet(dest_ip):
                 # Resolve MAC address (ARP would happen here)
@@ -119,8 +207,6 @@ class EndDevice(Entity):
             
             # Different subnet - need to use gateway
             elif self.default_gateway:
-                print(f"Device {self.id}: Sending to gateway {self.default_gateway}")
-                
                 gateway_mac = None
                 gateway_device = None
                 
@@ -132,10 +218,8 @@ class EndDevice(Entity):
                         break
                     elif isinstance(entity, (Hub, Switch, Bridge)):
                         for connected_entity in entity.connected_to:
-                            print(f"Checking connected entity {connected_entity} for gateway {self.default_gateway}")
                             if isinstance(connected_entity, Router) and connected_entity.has_ip(self.default_gateway):
                                 gateway_mac = connected_entity.get_mac_for_interface(self.default_gateway)
-                                print(f"received mac addess of gateway: {gateway_mac}")
                                 gateway_device = connected_entity
                                 break
                         
@@ -150,7 +234,7 @@ class EndDevice(Entity):
                         'type': 'IPv4',
                         'data': packet
                     }
-                    print(f"Device {self.id}: Sending {frame} to gateway {gateway_device.id}")
+                    
                     # If directly connected to router
                     if gateway_device in self.connected_to:
                         return gateway_device.receive(frame, self, layer=2)
@@ -162,18 +246,14 @@ class EndDevice(Entity):
                             if entity.forward(frame, self, gateway_device, layer=2, visited=visited_copy):
                                 return True
                 
-                print(f"Device {self.id}: Gateway {self.default_gateway} not reachable!")
                 return False
             else:
-                print(f"Device {self.id}: No gateway configured for destination {dest_ip}!")
                 return False
         
         return False
     
     def receive(self, data, source, layer=1):
         """Process received data at different layers"""
-        print(f"Device {self.id} received data from {source.id} at layer {layer}")
-        
         # Layer 1 - Physical layer (raw bits)
         if layer == 1:
             self.received_data.append({
@@ -181,7 +261,6 @@ class EndDevice(Entity):
                 "data": data,
                 "source": source.id
             })
-            print(f"Device {self.id} received raw data from {source.id}")
             return True
             
         # Layer 2 - Data Link layer (MAC addressing)
@@ -189,8 +268,6 @@ class EndDevice(Entity):
             if 'dest_mac' in data:  # It's a frame
                 destination_mac = data['dest_mac']
                 source_mac = data['source_mac']
-                
-                print(f"Device {self.id} received frame: src={source_mac}, dst={destination_mac}")
                 
                 if 'data' in data and isinstance(data['data'], dict) and 'source_ip' in data['data']:
                     self.arp_table[data['data']['source_ip']] = source_mac
@@ -220,7 +297,24 @@ class EndDevice(Entity):
                         "packet": data,
                         "source": source.id
                     })
-                    print(f"Device {self.id} received IP packet from {data['source_ip']}, data: {data['data']}")
+                    
+                    # Check if this is transport layer data
+                    if isinstance(data['data'], str) and ('HTTP' in data['data'] or 'GET' in data['data'] or 'DNS' in data['data']):
+                        # Extract port information if available
+                        src_port = dest_port = None
+                        if 'source_port' in data:
+                            src_port = data['source_port']
+                        if 'dest_port' in data:
+                            dest_port = data['dest_port']
+                            
+                        self.received_data.append({
+                            "layer": 4,
+                            "data": data['data'],
+                            "source": source.id,
+                            "source_port": src_port,
+                            "dest_port": dest_port,
+                            "protocol": "tcp" if 'TCP' in data['data'] else "udp"
+                        })
                     return True
                 else:
                     return False  # Not for this device
@@ -241,15 +335,12 @@ class Hub(Entity):
             visited = set()
             
         visited.add(self.id)
-        print(f"Hub {self.id} forwarding data from {source.id}")
         
         success = False
         
         for device in self.connected_to:
             if device == source or device.id in visited:
                 continue
-            
-            print(f"Hub {self.id} forwarding data to {device.id}")
             
             if isinstance(device, EndDevice):
                 result = device.receive(data, self, layer=layer)
@@ -307,8 +398,6 @@ class Switch(Entity):
         if layer < 2:
             return self._flood(frame, source, destination, visited)
             
-        print(f"Switch {self.id} forwarding frame from {source.id} to {destination.id if destination else 'broadcast'}")
-        
         # Update MAC table with source address
         if 'source_mac' in frame:
             source_mac = frame["source_mac"]
@@ -327,7 +416,6 @@ class Switch(Entity):
                 return self._flood_vlan(frame, source, destination, source_vlan, visited)
             
             if destination_mac in self.mac_table:
-                print(f"Switch {self.id} found destination MAC {destination_mac} in table")
                 dest_port = self.mac_table[destination_mac]
                 dest_vlan = self.vlan_table.get(dest_port, self.default_vlan)
                 
@@ -373,7 +461,6 @@ class Switch(Entity):
             
         success = False
         source_port = self.port_table.get(source)
-        print(f"Switch {self.id} flooding data in VLAN {source_vlan}")
         
         for device in self.connected_to:
             if device != source and device.id not in visited:
@@ -404,17 +491,6 @@ class Switch(Entity):
                 if mac:
                     return mac
         return None
-    
-    def _is_in_subnet(self, ip, subnet_ip, subnet_mask):
-        """Check if IP is in the subnet defined by subnet_ip and subnet_mask"""
-        ip_parts = ip.split('.')
-        subnet_parts = subnet_ip.split('.')
-        mask_parts = subnet_mask.split('.')
-        
-        for i in range(4):
-            if (int(ip_parts[i]) & int(mask_parts[i])) != (int(subnet_parts[i]) & int(mask_parts[i])):
-                return False
-        return True
 
 class Bridge(Entity):
     def __init__(self, id):
@@ -527,9 +603,7 @@ class Router(Entity):
     
     def has_ip(self, ip_address):
         """Check if the router has the given IP on any interface"""
-        print(f"Router {self.id} checking for IP {ip_address} in {self.interfaces.items()}")
         for interface, details in self.interfaces.items():
-            print(f"Checking interface {interface}: {details}")
             if details['ip'] == ip_address:
                 return True
         return False
@@ -602,7 +676,6 @@ class Router(Entity):
     def enable_nat(self):
         """Enable Network Address Translation"""
         if not self.public_ip:
-            print("Cannot enable NAT without a public IP address")
             return False
         return True
     
@@ -612,8 +685,6 @@ class Router(Entity):
         best_mask_count = -1
         
         for route in self.routing_table:
-            # Check if this route matches the destination
-            print(f"Matching route: {route} with destination {dest_ip}")
             ip_parts = dest_ip.split('.')
             net_parts = route['network'].split('.')
             mask_parts = route['subnet_mask'].split('.')
@@ -649,26 +720,22 @@ class Router(Entity):
             return self.receive(packet, source, layer)
         
         if layer == 3 and isinstance(packet, dict) and 'dest_ip' in packet:
-            print(f"\nRouter {self.id} processing packet: {packet} at layer {layer}\n")
             dest_ip = packet['dest_ip']
             
             # Decrement TTL
             packet['ttl'] = packet.get('ttl', 64) - 1
             if packet['ttl'] <= 0:
-                print(f"Router {self.id}: TTL expired for packet to {dest_ip}")
                 return False
             
             # Find the best matching route
             route = self._match_route(dest_ip)
-            print(f"route received: {route}")
             
             if route:
                 outgoing_interface = route['interface']
                 next_hop = route['next_hop']
-                print(f"\nRouter {self.id}: forwarding to {next_hop} via {outgoing_interface}\n")
+                
                 # If no next hop specified, the destination is directly connected
                 if not next_hop:
-                    print(f"\n\nRouter {self.id}: port table: {self.port_table.items()}\n\n")
                     for device, interface in self.port_table.items():
                         if interface == outgoing_interface:
                             if isinstance(device, EndDevice) and device.ip == dest_ip:
@@ -696,7 +763,6 @@ class Router(Entity):
                     next_hop_mac = None
 
                     # First check direct connections
-                    print(f"\n\nRouter {self.id}: port table: {self.port_table.items()}\n\n")
                     for device, interface in self.port_table.items():
                         if interface == outgoing_interface:
                             if isinstance(device, Router):
@@ -736,7 +802,6 @@ class Router(Entity):
                         
                         return next_hop_device.receive(frame, self, layer=2)
             
-            print(f"Router {self.id}: No route to {dest_ip}")
             return False
             
         return False
@@ -749,9 +814,36 @@ class Router(Entity):
             
             for interface_name, interface in self.interfaces.items():
                 if packet['dest_ip'] == interface['ip']:
-                    print(f"Router {self.id}: Received packet for interface {interface_name}")
                     return True
             
             return self.forward(packet, source, layer=3)
         
         return False
+
+# Application Layer Protocol Handlers
+def http_handler(request):
+    """Simple HTTP request handler"""
+    if "GET /" in request:
+        return ("HTTP/1.1 200 OK\r\n"
+                "Content-Type: text/html\r\n"
+                "\r\n"
+                "<html><body><h1>Hello Tawheed!</h1></body></html>")
+    return None
+
+def dns_handler(query):
+    """Simple DNS request handler"""
+    dns_records = {
+        "example.com": "192.168.1.100",
+        "test.com": "192.168.1.101"
+    }
+    if query in dns_records:
+        return f"DNS Response: {query} -> {dns_records[query]}"
+    return f"DNS Response: NXDOMAIN (No record for {query})"
+
+def ftp_handler(command):
+    """Simple FTP command handler"""
+    if command == "LIST":
+        return "226 Directory listing:\nfile1.txt\nfile2.txt"
+    elif command.startswith("GET "):
+        return f"150 Opening data connection for {command[4:]}\n226 Transfer complete"
+    return "500 Unknown command"

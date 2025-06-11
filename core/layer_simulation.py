@@ -1,9 +1,64 @@
 import streamlit as st
-from core.devices import EndDevice, Hub, Switch, Bridge, Router
+from core.devices import EndDevice, Hub, Switch, Bridge, Router, http_handler, dns_handler, ftp_handler
 from core.network import Network
+from collections import defaultdict
+import random
 import time
 from core.functions import visualize_topology, find_path, restore_connections, initialize_session_state
 from core.external import prebuilt_network_ui
+
+class TransportLayerSimulator:
+    def __init__(self):
+        self.connections = defaultdict(dict)  # (device_id, ip, port) -> connection state
+        
+    def get_ephemeral_port(self, device):
+        """Get a random ephemeral port (49152-65535)"""
+        print(f"\n\n{device.id} Ports: {device.ports.items()}\n\n")
+        used_ports = set(port_num for port_num, port in device.ports.items())
+        while True:
+            port = random.randint(49152, 65535)
+            if port not in used_ports:
+                return port
+    
+    def tcp_handshake(self, src_device, src_port, dest_device, dest_port):
+        """Simulate TCP 3-way handshake"""
+        # SYN
+        self.log_message(src_device, dest_device, 
+                        f"SYN (seq={random.randint(1000, 9999)})", 
+                        src_port, dest_port, "tcp")
+        
+        # SYN-ACK
+        self.log_message(dest_device, src_device, 
+                        f"SYN-ACK (seq={random.randint(1000, 9999)}, ack={random.randint(1000, 9999)})", 
+                        dest_port, src_port, "tcp")
+        
+        # ACK
+        self.log_message(src_device, dest_device, 
+                        f"ACK (seq={random.randint(1000, 9999)}, ack={random.randint(1000, 9999)})", 
+                        src_port, dest_port, "tcp")
+        
+        return True
+    
+    def log_message(self, src, dest, data, src_port=None, dest_port=None, protocol=None):
+        """Record a message between devices"""
+        msg = {
+            "timestamp": time.strftime("%H:%M:%S"),
+            "source": src.id,
+            "destination": dest.id,
+            "data": data,
+            "source_port": src_port,
+            "dest_port": dest_port,
+            "protocol": protocol,
+            "layer": 4 if protocol else 5
+        }
+        
+        # Add to both devices' received data
+        src.received_data.append(msg)
+        dest.received_data.append(msg)
+        
+        # Also add to session state messages for global history
+        st.session_state.messages.append(msg)
+
 
 def add_device():
     with st.form("add_device"):
@@ -24,6 +79,31 @@ def add_device():
                     st.error(f"Device {device_id} already exists!")
             else:
                 st.error("Please provide Device ID, MAC Address, and IP Address.")
+
+def port_assignment():
+    if len(st.session_state.devices) > 0:
+        selected_device = st.selectbox("Select Device", list(st.session_state.devices.values()), format_func=lambda x: f"{x.id} ({type(x).__name__})")
+                    
+        with st.form("assign_port"):
+            st.subheader("Assign Service Port")
+            port_num = st.number_input("Port Number", min_value=1, max_value=65535, value=80)
+            protocol = st.selectbox("Protocol", ["tcp", "udp"])
+            service = st.selectbox("Service", ["http", "dns", "ftp"])
+            
+            if st.form_submit_button("Assign Port"):
+                handler = None
+                if service == "http":
+                    handler = http_handler
+                elif service == "dns":
+                    handler = dns_handler
+                elif service == "ftp":
+                    handler = ftp_handler
+                
+                if selected_device.assign_port(port_num, protocol, service, handler):
+                    st.session_state.devices[selected_device.id] = selected_device
+                    st.success(f"Port {port_num}/{protocol} assigned for {service}")
+                else:
+                    st.error(f"Port {port_num} is already in use or device doesn't exist")
 
 def add_hub():
     with st.form("add_hub"):
@@ -261,11 +341,48 @@ def send_data(devices, graph_placeholder):
     source = st.session_state.devices[source.id]
     dest = st.session_state.devices[dest.id]
     
-    data = st.text_input("Data to send", "Hello, Network!")
-    
     # Layer selection
-    layer = st.radio("Network Layer", [1, 2, 3], 
-                     format_func=lambda x: f"Layer {x} - {['Physical', 'Data Link', 'Network'][x-1]}")
+    layer = st.radio("Network Layer", [1, 2, 3, 4, 5], 
+                     format_func=lambda x: {
+                         1: "Layer 1 - Physical",
+                         2: "Layer 2 - Data Link",
+                         3: "Layer 3 - Network",
+                         4: "Layer 4 - Transport",
+                         5: "Layer 5 - Application"
+                     }[x])
+    
+    # Layer-specific data input
+    if layer >= 4:  # Transport or Application layer
+        protocol = st.selectbox("Protocol", ["tcp", "udp"])
+        
+        # Show available services on destination
+        print(f"\n\n\n{dest.id} Ports: {dest.ports.items()}\n\n\n")
+        dest_ports = {port_num: port for port_num, port in dest.ports.items() 
+                     if port['protocol'] == protocol}
+        
+        if dest_ports:
+            port_options = [(p, f"{p} ({dest_ports[p]['service']})") for p in dest_ports]
+            dest_port = st.selectbox("Destination Port", 
+                                   [p[0] for p in port_options],
+                                   format_func=lambda x: f"{x} ({dest_ports[x]['service']})")
+            
+            # Protocol-specific data
+            if dest_ports[dest_port]['service'] == "http":
+                data = "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n"
+            elif dest_ports[dest_port]['service'] == "dns":
+                data = st.text_input("DNS Query", "example.com")
+            elif dest_ports[dest_port]['service'] == "ftp":
+                data = st.selectbox("FTP Command", ["LIST", "GET file.txt"])
+            else:
+                data = st.text_input("Custom Data", "Hello, server!")
+        else:
+            st.warning(f"No {protocol.upper()} services configured on destination")
+            dest_port = st.number_input("Destination Port", min_value=1, max_value=65535, value=80)
+            data = st.text_input("Data to send", "Hello, server!")
+    else:  # Layers 1-3
+        data = st.text_input("Data to send", "Hello, Network!")
+        protocol = None
+        dest_port = None
     
     if st.button("Send Data"):
         path = find_path(source, dest, st.session_state.connections)
@@ -274,13 +391,47 @@ def send_data(devices, graph_placeholder):
             sent = False
             
             # Check gateway configuration for layer 3
-            if layer == 3 and not source.same_subnet(dest.ip) and not source.default_gateway:
-                st.error(f"Source device {source.id}same_subnet needs a default gateway to reach {dest.id}")
+            if layer >= 3 and not source.same_subnet(dest.ip) and not source.default_gateway:
+                st.error(f"Source device {source.id} needs a default gateway to reach {dest.id}")
                 return
                 
-            # Try to send data
-            print(layer)
-            sent = source.send(data, dest, layer=layer)
+            # For transport/application layer
+            if layer >= 4:
+                if 'transport_sim' not in st.session_state:
+                    st.session_state.transport_sim = TransportLayerSimulator()
+                
+                transport_sim = st.session_state.transport_sim
+                
+                # Get source port
+                src_port = transport_sim.get_ephemeral_port(source)
+                
+                # For TCP, simulate 3-way handshake
+                if protocol.lower() == "tcp":
+                    transport_sim.tcp_handshake(source, src_port, dest, dest_port)
+                
+                # Check if destination port is open
+                if dest_port not in dest.ports or dest.ports[dest_port]['protocol'] != protocol:
+                    transport_sim.log_message(source, dest, 
+                                            f"Connection refused (port {dest_port} closed)", 
+                                            src_port, dest_port, protocol)
+                    st.error(f"Port {dest_port}/{protocol} is not open on destination")
+                    return
+                
+                # Send actual data
+                service = dest.ports[dest_port]
+                if service['handler']:
+                    response = service['handler'](data)
+                    transport_sim.log_message(source, dest, data, src_port, dest_port, protocol)
+                    
+                    if response:
+                        transport_sim.log_message(dest, source, response, dest_port, src_port, protocol)
+                else:
+                    transport_sim.log_message(source, dest, data, src_port, dest_port, protocol)
+                
+                sent = True
+            else:
+                # Try to send data for layers 1-3
+                sent = source.send(data, dest, layer=layer)
             
             if sent:
                 # Create message record
@@ -302,6 +453,11 @@ def send_data(devices, graph_placeholder):
                     msg["source_ip"] = source.ip
                     msg["dest_ip"] = dest.ip
                 
+                if layer >= 4:
+                    msg["source_port"] = src_port
+                    msg["dest_port"] = dest_port
+                    msg["protocol"] = protocol
+                
                 st.session_state.messages.append(msg)
                 
                 # Update visualization
@@ -314,8 +470,6 @@ def send_data(devices, graph_placeholder):
                 st.error(f"Failed to send data to {dest.id}")
         else:
             st.error(f"No path found between {source.id} and {dest.id}")
-    else:
-        st.info("Add at least two devices to send data.")
 
 def vlan_configuration():
     switches = list(st.session_state.switches.values())
@@ -405,6 +559,7 @@ def layerSimulation():
         
         with st.expander("Add Network Components", expanded=True):
             add_device()
+            port_assignment()
             add_hub()
             add_switch()
             add_bridge()
@@ -480,15 +635,26 @@ def layerSimulation():
             if layer_messages:
                 for idx, msg in enumerate(reversed(layer_messages)):
                     st.write(f"**{msg['timestamp']}**: {msg['source']} → {msg['destination']}")
-                    st.text(f"Data: {msg['data']}")
-                    st.text(f"Path: {' → '.join(msg['path'])}")
-                    st.text(f"Layer: {msg['layer']} ({['Physical', 'Data Link', 'Network'][msg['layer']-1]})")
                     
-                    if 'source_mac' in msg and 'dest_mac' in msg:
-                        st.text(f"Source MAC: {msg['source_mac']}, Destination MAC: {msg['dest_mac']}")
+                    # Show layer-specific details
+                    print(f"\n\n\n{msg}\n\n\n")
+                    if msg['layer'] <= 3:
+                        st.text(f"Data: {msg['data']}")
+                        st.text(f"Path: {' → '.join(msg['path'])}")
+                        st.text(f"Layer: {msg['layer']} ({['Physical', 'Data Link', 'Network'][msg['layer']-1]})")
                         
-                    if 'source_ip' in msg and 'dest_ip' in msg:
-                        st.text(f"Source IP: {msg['source_ip']}, Destination IP: {msg['dest_ip']}")
+                        if 'source_mac' in msg and 'dest_mac' in msg:
+                            st.text(f"Source MAC: {msg['source_mac']}, Destination MAC: {msg['dest_mac']}")
+                            
+                        if 'source_ip' in msg and 'dest_ip' in msg:
+                            st.text(f"Source IP: {msg['source_ip']}, Destination IP: {msg['dest_ip']}")
+                    else:
+                        # Transport/Application layer messages
+                        st.text(f"Layer: {msg['layer']} ({['Transport', 'Application'][msg['layer']-4]})")
+                        st.text(f"Protocol: {msg.get('protocol', '').upper()}")
+                        st.text(f"Source Port: {msg.get('source_port', '')}")
+                        st.text(f"Dest Port: {msg.get('dest_port', '')}")
+                        st.code(msg['data'])
                     
                     if idx < len(layer_messages) - 1:
                         st.divider()
@@ -524,6 +690,12 @@ def layerSimulation():
                             for ip, mac in device.arp_table.items():
                                 st.write(f"IP: {ip} → MAC: {mac}")
                         
+                        # Show services
+                        if hasattr(device, 'ports') and device.ports:
+                            st.write("**Services:**")
+                            for port_num, port_info in device.ports.items():
+                                st.write(f"Port {port_num}/{port_info['protocol']}: {port_info['service']}")
+                        
                         # Show received data 
                         if hasattr(device, 'received_data') and device.received_data:
                             st.write(f"**Received Data ({len(device.received_data)}):**")
@@ -541,6 +713,10 @@ def layerSimulation():
                                     packet = data.get('packet', {})
                                     src_ip = packet.get('source_ip', 'Unknown')
                                     st.write(f"Layer 3 packet from {source} (IP: {src_ip})")
+                                elif layer >= 4:
+                                    protocol = data.get('protocol', '').upper()
+                                    src_port = data.get('source_port', '')
+                                    st.write(f"Layer {layer} {protocol} data from {source}:{src_port}")
                         st.divider()
                 else:
                     st.info("No devices added yet.")
@@ -697,7 +873,9 @@ def layerSimulation():
             st.write(f"Total Collision Domains: {collision_domains}")
 
     if st.button("Reset Network"):
-        for key in ['network', 'devices', 'hubs', 'switches', 'bridges', 'connections', 'messages', 'routers']:
+        for key in ['network', 'devices', 'hubs', 'switches', 'bridges', 'connections', 'messages', 'routers', 'transport_sim']:
             if key in st.session_state:
                 del st.session_state[key]
         st.rerun()
+
+        
