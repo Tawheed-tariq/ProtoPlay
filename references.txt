@@ -8,9 +8,14 @@ https://networkx.org/
 
 https://claude.ai/
 
+
+## rip
 https://github.com/NetFPGA/NetFPGA-public
 
 https://github.com/puetsua/pyRIP
+
+
+## transport and app layer
 https://github.com/Amitha353/The-Bits-and-Bytes-of-Computer-Networking/tree/master
 https://github.com/VasanthVanan/computer-networking-top-down-approach-notes/blob/main/Chapter%203:%20Transport%20Layer.md
 https://github.com/pandax381/microps
