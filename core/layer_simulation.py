@@ -1,63 +1,11 @@
 import streamlit as st
-from core.devices import EndDevice, Hub, Switch, Bridge, Router, http_handler, dns_handler, ftp_handler
+from core.devices import EndDevice, Hub, Switch, Bridge, Router, http_handler, dns_handler, ftp_handler, TransportLayerSimulator
 from core.network import Network
 from collections import defaultdict
 import random
 import time
 from core.functions import visualize_topology, find_path, restore_connections, initialize_session_state
 from core.external import prebuilt_network_ui
-
-class TransportLayerSimulator:
-    def __init__(self):
-        self.connections = defaultdict(dict)  # (device_id, ip, port) -> connection state
-        
-    def get_ephemeral_port(self, device):
-        """Get a random ephemeral port (49152-65535)"""
-        print(f"\n\n{device.id} Ports: {device.ports.items()}\n\n")
-        used_ports = set(port_num for port_num, port in device.ports.items())
-        while True:
-            port = random.randint(49152, 65535)
-            if port not in used_ports:
-                return port
-    
-    def tcp_handshake(self, src_device, src_port, dest_device, dest_port):
-        """Simulate TCP 3-way handshake"""
-        # SYN
-        self.log_message(src_device, dest_device, 
-                        f"SYN (seq={random.randint(1000, 9999)})", 
-                        src_port, dest_port, "tcp")
-        
-        # SYN-ACK
-        self.log_message(dest_device, src_device, 
-                        f"SYN-ACK (seq={random.randint(1000, 9999)}, ack={random.randint(1000, 9999)})", 
-                        dest_port, src_port, "tcp")
-        
-        # ACK
-        self.log_message(src_device, dest_device, 
-                        f"ACK (seq={random.randint(1000, 9999)}, ack={random.randint(1000, 9999)})", 
-                        src_port, dest_port, "tcp")
-        
-        return True
-    
-    def log_message(self, src, dest, data, src_port=None, dest_port=None, protocol=None):
-        """Record a message between devices"""
-        msg = {
-            "timestamp": time.strftime("%H:%M:%S"),
-            "source": src.id,
-            "destination": dest.id,
-            "data": data,
-            "source_port": src_port,
-            "dest_port": dest_port,
-            "protocol": protocol,
-            "layer": 4 if protocol else 5
-        }
-        
-        # Add to both devices' received data
-        src.received_data.append(msg)
-        dest.received_data.append(msg)
-        
-        # Also add to session state messages for global history
-        st.session_state.messages.append(msg)
 
 
 def add_device():
@@ -337,11 +285,9 @@ def send_data(devices, graph_placeholder):
     source = st.selectbox("Source Device", devices, format_func=lambda x: x.id)
     dest = st.selectbox("Destination Device", [d for d in devices if d != source], format_func=lambda x: x.id)
     
-    # Get the actual devices from session state
     source = st.session_state.devices[source.id]
     dest = st.session_state.devices[dest.id]
     
-    # Layer selection
     layer = st.radio("Network Layer", [1, 2, 3, 4, 5], 
                      format_func=lambda x: {
                          1: "Layer 1 - Physical",
@@ -351,12 +297,9 @@ def send_data(devices, graph_placeholder):
                          5: "Layer 5 - Application"
                      }[x])
     
-    # Layer-specific data input
-    if layer >= 4:  # Transport or Application layer
+    if layer >= 4:  
         protocol = st.selectbox("Protocol", ["tcp", "udp"])
         
-        # Show available services on destination
-        print(f"\n\n\n{dest.id} Ports: {dest.ports.items()}\n\n\n")
         dest_ports = {port_num: port for port_num, port in dest.ports.items() 
                      if port['protocol'] == protocol}
         
@@ -379,37 +322,30 @@ def send_data(devices, graph_placeholder):
             st.warning(f"No {protocol.upper()} services configured on destination")
             dest_port = st.number_input("Destination Port", min_value=1, max_value=65535, value=80)
             data = st.text_input("Data to send", "Hello, server!")
-    else:  # Layers 1-3
+    else:  
         data = st.text_input("Data to send", "Hello, Network!")
         protocol = None
         dest_port = None
     
     if st.button("Send Data"):
         path = find_path(source, dest, st.session_state.connections)
-        
+        print(f"{source.id} sending data to {dest.id}")
         if path:
             sent = False
             
-            # Check gateway configuration for layer 3
             if layer >= 3 and not source.same_subnet(dest.ip) and not source.default_gateway:
                 st.error(f"Source device {source.id} needs a default gateway to reach {dest.id}")
                 return
                 
-            # For transport/application layer
             if layer >= 4:
                 if 'transport_sim' not in st.session_state:
                     st.session_state.transport_sim = TransportLayerSimulator()
-                
                 transport_sim = st.session_state.transport_sim
                 
-                # Get source port
                 src_port = transport_sim.get_ephemeral_port(source)
-                
-                # For TCP, simulate 3-way handshake
-                if protocol.lower() == "tcp":
-                    transport_sim.tcp_handshake(source, src_port, dest, dest_port)
-                
-                # Check if destination port is open
+                print(f"Source Port: {src_port} assigned to {source.id}")
+                print(f"Destination Port: {dest_port} for {dest.id}")
+                print(f"Data to be send: {data}")
                 if dest_port not in dest.ports or dest.ports[dest_port]['protocol'] != protocol:
                     transport_sim.log_message(source, dest, 
                                             f"Connection refused (port {dest_port} closed)", 
@@ -417,24 +353,16 @@ def send_data(devices, graph_placeholder):
                     st.error(f"Port {dest_port}/{protocol} is not open on destination")
                     return
                 
-                # Send actual data
                 service = dest.ports[dest_port]
+                print(f"Service: {service}")
                 if service['handler']:
                     response = service['handler'](data)
-                    transport_sim.log_message(source, dest, data, src_port, dest_port, protocol)
                     
-                    if response:
-                        transport_sim.log_message(dest, source, response, dest_port, src_port, protocol)
-                else:
-                    transport_sim.log_message(source, dest, data, src_port, dest_port, protocol)
-                
-                sent = True
+                sent = source.send(data, dest, layer=3)
             else:
-                # Try to send data for layers 1-3
                 sent = source.send(data, dest, layer=layer)
             
             if sent:
-                # Create message record
                 msg = {
                     "source": source.id,
                     "destination": dest.id,
@@ -444,7 +372,6 @@ def send_data(devices, graph_placeholder):
                     "layer": layer
                 }
                 
-                # Add layer-specific details
                 if layer >= 2:
                     msg["source_mac"] = source.mac
                     msg["dest_mac"] = dest.mac
@@ -460,7 +387,6 @@ def send_data(devices, graph_placeholder):
                 
                 st.session_state.messages.append(msg)
                 
-                # Update visualization
                 html = visualize_topology(st.session_state.network, st.session_state.connections, highlight_path=path)
                 graph_placeholder.empty()  
                 st.components.v1.html(html, height=500)  
@@ -637,7 +563,6 @@ def layerSimulation():
                     st.write(f"**{msg['timestamp']}**: {msg['source']} → {msg['destination']}")
                     
                     # Show layer-specific details
-                    print(f"\n\n\n{msg}\n\n\n")
                     if msg['layer'] <= 3:
                         st.text(f"Data: {msg['data']}")
                         st.text(f"Path: {' → '.join(msg['path'])}")
