@@ -46,7 +46,7 @@ def port_assignment():
                     handler = dns_handler
                 elif service == "ftp":
                     handler = ftp_handler
-                
+
                 if selected_device.assign_port(port_num, protocol, service, handler):
                     st.session_state.devices[selected_device.id] = selected_device
                     st.success(f"Port {port_num}/{protocol} assigned for {service}")
@@ -315,7 +315,15 @@ def send_data(devices, graph_placeholder):
             elif dest_ports[dest_port]['service'] == "dns":
                 data = st.text_input("DNS Query", "example.com")
             elif dest_ports[dest_port]['service'] == "ftp":
-                data = st.selectbox("FTP Command", ["LIST", "GET file.txt"])
+                command = st.selectbox("FTP Command", ["", "LIST", "PUT"])
+                if command == "PUT":
+                    uploaded_file = st.file_uploader("Upload file for FTP", type=['txt', 'pdf', 'doc', 'docx'])
+                    if uploaded_file is not None:
+                        data = ftp_handler("PUT", uploaded_file)
+                    else:
+                        data = "PUT command selected but no file uploaded"
+                elif command == "LIST":
+                    data = ftp_handler("LIST")
             else:
                 data = st.text_input("Custom Data", "Hello, server!")
         else:

@@ -2,6 +2,7 @@ import random
 from collections import defaultdict
 import time
 import streamlit as st
+import os
 
 class Entity:
     def __init__(self, id):
@@ -713,7 +714,7 @@ class TransportLayerSimulator:
             if port not in used_ports:
                 return port
         
-        
+
     def log_message(self, src, dest, data, src_port=None, dest_port=None, protocol=None):
         msg = {
             "timestamp": time.strftime("%H:%M:%S"),
@@ -748,9 +749,25 @@ def dns_handler(query):
         return f"DNS Response: {query} -> {dns_records[query]}"
     return f"DNS Response: NXDOMAIN (No record for {query})"
 
-def ftp_handler(command):
+def ftp_handler(command, uploaded_file=None):
     if command == "LIST":
-        return "226 Directory listing:\nfile1.txt\nfile2.txt"
-    elif command.startswith("GET "):
-        return f"150 Opening data connection for {command[4:]}\n226 Transfer complete"
+        try:
+            files = os.listdir('.')
+            file_list = "\n".join(files) if files else "Directory is empty"
+            return f"Opening data connection\n{file_list}\nTransfer complete"
+        except Exception as e:
+            return "Failed to list"
+    elif command.startswith("PUT"):
+        if uploaded_file is not None:
+            try:
+                content = uploaded_file.read()
+                if isinstance(content, bytes):
+                    content = content.decode('utf-8')
+                first_line = content.split('\n')[0] if content else "Empty file"
+                print(f"First line of file recieved: {first_line}")
+            except Exception as e:
+                print(f"Error reading file: {e}")
+            return f"File {uploaded_file} received successfully\nTransfer complete"
+        else:
+            return f"Error: No file provided for upload"
     return "500 Unknown command"
