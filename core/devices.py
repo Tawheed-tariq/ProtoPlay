@@ -750,7 +750,7 @@ def dns_handler(query):
     return f"DNS Response: NXDOMAIN (No record for {query})"
 
 def ftp_handler(command, uploaded_file=None):
-    if command..startswith("LIST"):
+    if command.startswith("LIST"):
         try:
             files = os.listdir('.')
             file_list = "\n".join(files) if files else "Directory is empty"
