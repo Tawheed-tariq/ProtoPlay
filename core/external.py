@@ -57,8 +57,7 @@ def create_prebuilt_network(network_type):
             
         except Exception as e:
             st.error(f"Error creating prebuilt network: {str(e)}")
-            return False
-    
+            return False 
     elif network_type == "router_network":
         try:
             router = Router("Router1")
@@ -200,8 +199,7 @@ def create_prebuilt_network(network_type):
         except Exception as e:
             st.error(f"Error creating router network: {str(e)}")
             return False
-        
-    
+          
     return False
 
 def prebuilt_network_ui():

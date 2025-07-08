@@ -487,7 +487,6 @@ class Router(Entity):
         self.routing_table = []  # [{network, subnet_mask, next_hop, interface}, ...]
         self.port_table = {}  
         self.arp_table = {}  
-        self.nat_table = {}  
         self.public_ip = None  
     
     def add_interface(self, name, ip_address, mac_address, subnet_mask="255.255.255.0"):
@@ -713,6 +712,7 @@ class TransportLayerSimulator:
             port = random.randint(49152, 65535)
             if port not in used_ports:
                 return port
+        
         
     def log_message(self, src, dest, data, src_port=None, dest_port=None, protocol=None):
         msg = {
